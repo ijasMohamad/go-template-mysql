@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -91,6 +92,7 @@ func Start(e *echo.Echo, cfg *Config) {
 	go func() {
 		zaplog.Logger.Info("Warming up server... ")
 		if err := e.StartServer(s); err != nil {
+			fmt.Println("Zap err:", err)
 			e.Logger.Info("Shutting down the server")
 		}
 	}()

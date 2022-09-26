@@ -56,6 +56,8 @@ func FileName() string {
 func LoadEnv() error {
 	envName := "ENVIRONMENT_NAME"
 	env := os.Getenv(envName)
+	env = "local"
+	fmt.Println("envName:", env)
 
 	if env == "" {
 		env = "local"
