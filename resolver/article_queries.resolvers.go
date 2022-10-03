@@ -5,36 +5,32 @@ package resolver
 
 import (
 	"context"
+	"go-template/daos"
 	"go-template/gqlmodels"
-	"go-template/models"
 	"go-template/pkg/utl/cnvrttogql"
-
-	"github.com/volatiletech/sqlboiler/v4/boil"
 )
 
 // Article is the resolver for the article field.
 func (r *queryResolver) Article(ctx context.Context, id int) (*gqlmodels.Article, error) {
-	var contextExecutor = boil.GetContextDB()
-
-	article, err := models.FindArticle(ctx, contextExecutor, id)
+	// doas...
+	article, err := daos.FindArticleById(id, ctx)
 	if err != nil {
 		return nil, err
 	}
-
 	return cnvrttogql.ArticleToGraphQLArticle(article), nil
 }
 
 // AllArticles is the resolver for the allArticles field.
-func (r *queryResolver) AllArticles(ctx context.Context) ([]*gqlmodels.Article, error) {
-	var contextExecutor = boil.GetContextDB()
-
-
-	articles, err := models.Articles().All(ctx, contextExecutor)
+func (r *queryResolver) AllArticles(ctx context.Context) (*gqlmodels.ArticlesPayload, error) {
+	// daos...
+	articles, count, err := daos.FindAllArticlesWithCount(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	return cnvrttogql.ArticlesToGraphQLArticles(articles), nil
+	graphqlArticles := cnvrttogql.ArticlesToGraphQLArticles(articles)
+	return &gqlmodels.ArticlesPayload{
+		Articles: graphqlArticles,
+		Total:    count}, nil
 }
 
 // Query returns gqlmodels.QueryResolver implementation.

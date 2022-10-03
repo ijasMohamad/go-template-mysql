@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -35,7 +36,9 @@ type Config struct {
 }
 
 type ResolverRoot interface {
+	Mutation() MutationResolver
 	Query() QueryResolver
+	Subscription() SubscriptionResolver
 }
 
 type DirectiveRoot struct {
@@ -43,11 +46,24 @@ type DirectiveRoot struct {
 
 type ComplexityRoot struct {
 	Article struct {
-		CreateAt  func(childComplexity int) int
+		CreatedAt func(childComplexity int) int
 		DeletedAt func(childComplexity int) int
 		ID        func(childComplexity int) int
 		Title     func(childComplexity int) int
 		UpdatedAt func(childComplexity int) int
+	}
+
+	ArticleDeletePayload struct {
+		ID func(childComplexity int) int
+	}
+
+	ArticlePayload struct {
+		Article func(childComplexity int) int
+	}
+
+	ArticlesPayload struct {
+		Articles func(childComplexity int) int
+		Total    func(childComplexity int) int
 	}
 
 	Author struct {
@@ -63,19 +79,58 @@ type ComplexityRoot struct {
 		Username  func(childComplexity int) int
 	}
 
+	AuthorDeletePayload struct {
+		ID func(childComplexity int) int
+	}
+
+	AuthorPayload struct {
+		Author func(childComplexity int) int
+	}
+
+	AuthorsPayload struct {
+		Authors func(childComplexity int) int
+		Total   func(childComplexity int) int
+	}
+
+	Mutation struct {
+		CreateArticle func(childComplexity int, input ArticleCreateInput) int
+		CreateAuthor  func(childComplexity int, input AuthorCreateInput) int
+		DeleteArticle func(childComplexity int, input *ArticleDeleteInput) int
+		DeleteAuthor  func(childComplexity int, input *AuthorDeleteInput) int
+		UpdateArticle func(childComplexity int, input ArticleUpdateInput) int
+		UpdateAuthor  func(childComplexity int, input *AuthorUpdateInput) int
+	}
+
 	Query struct {
 		AllArticles func(childComplexity int) int
 		AllAuthors  func(childComplexity int) int
 		Article     func(childComplexity int, id int) int
 		Author      func(childComplexity int, id int) int
 	}
+
+	Subscription struct {
+		ArticleNotification func(childComplexity int) int
+		AuthorNotification  func(childComplexity int) int
+	}
 }
 
+type MutationResolver interface {
+	CreateArticle(ctx context.Context, input ArticleCreateInput) (*Article, error)
+	UpdateArticle(ctx context.Context, input ArticleUpdateInput) (*Article, error)
+	DeleteArticle(ctx context.Context, input *ArticleDeleteInput) (*ArticleDeletePayload, error)
+	CreateAuthor(ctx context.Context, input AuthorCreateInput) (*Author, error)
+	UpdateAuthor(ctx context.Context, input *AuthorUpdateInput) (*Author, error)
+	DeleteAuthor(ctx context.Context, input *AuthorDeleteInput) (*AuthorDeletePayload, error)
+}
 type QueryResolver interface {
 	Article(ctx context.Context, id int) (*Article, error)
-	AllArticles(ctx context.Context) ([]*Article, error)
+	AllArticles(ctx context.Context) (*ArticlesPayload, error)
 	Author(ctx context.Context, id int) (*Author, error)
-	AllAuthors(ctx context.Context) ([]*Author, error)
+	AllAuthors(ctx context.Context) (*AuthorsPayload, error)
+}
+type SubscriptionResolver interface {
+	AuthorNotification(ctx context.Context) (<-chan *Author, error)
+	ArticleNotification(ctx context.Context) (<-chan *Article, error)
 }
 
 type executableSchema struct {
@@ -93,12 +148,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 	_ = ec
 	switch typeName + "." + field {
 
-	case "Article.createAt":
-		if e.complexity.Article.CreateAt == nil {
+	case "Article.createdAt":
+		if e.complexity.Article.CreatedAt == nil {
 			break
 		}
 
-		return e.complexity.Article.CreateAt(childComplexity), true
+		return e.complexity.Article.CreatedAt(childComplexity), true
 
 	case "Article.deletedAt":
 		if e.complexity.Article.DeletedAt == nil {
@@ -127,6 +182,34 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Article.UpdatedAt(childComplexity), true
+
+	case "ArticleDeletePayload.id":
+		if e.complexity.ArticleDeletePayload.ID == nil {
+			break
+		}
+
+		return e.complexity.ArticleDeletePayload.ID(childComplexity), true
+
+	case "ArticlePayload.article":
+		if e.complexity.ArticlePayload.Article == nil {
+			break
+		}
+
+		return e.complexity.ArticlePayload.Article(childComplexity), true
+
+	case "ArticlesPayload.articles":
+		if e.complexity.ArticlesPayload.Articles == nil {
+			break
+		}
+
+		return e.complexity.ArticlesPayload.Articles(childComplexity), true
+
+	case "ArticlesPayload.total":
+		if e.complexity.ArticlesPayload.Total == nil {
+			break
+		}
+
+		return e.complexity.ArticlesPayload.Total(childComplexity), true
 
 	case "Author.active":
 		if e.complexity.Author.Active == nil {
@@ -198,6 +281,106 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Author.Username(childComplexity), true
 
+	case "AuthorDeletePayload.id":
+		if e.complexity.AuthorDeletePayload.ID == nil {
+			break
+		}
+
+		return e.complexity.AuthorDeletePayload.ID(childComplexity), true
+
+	case "AuthorPayload.author":
+		if e.complexity.AuthorPayload.Author == nil {
+			break
+		}
+
+		return e.complexity.AuthorPayload.Author(childComplexity), true
+
+	case "AuthorsPayload.authors":
+		if e.complexity.AuthorsPayload.Authors == nil {
+			break
+		}
+
+		return e.complexity.AuthorsPayload.Authors(childComplexity), true
+
+	case "AuthorsPayload.total":
+		if e.complexity.AuthorsPayload.Total == nil {
+			break
+		}
+
+		return e.complexity.AuthorsPayload.Total(childComplexity), true
+
+	case "Mutation.createArticle":
+		if e.complexity.Mutation.CreateArticle == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createArticle_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.CreateArticle(childComplexity, args["input"].(ArticleCreateInput)), true
+
+	case "Mutation.createAuthor":
+		if e.complexity.Mutation.CreateAuthor == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createAuthor_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.CreateAuthor(childComplexity, args["input"].(AuthorCreateInput)), true
+
+	case "Mutation.deleteArticle":
+		if e.complexity.Mutation.DeleteArticle == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteArticle_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.DeleteArticle(childComplexity, args["input"].(*ArticleDeleteInput)), true
+
+	case "Mutation.deleteAuthor":
+		if e.complexity.Mutation.DeleteAuthor == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteAuthor_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.DeleteAuthor(childComplexity, args["input"].(*AuthorDeleteInput)), true
+
+	case "Mutation.updateArticle":
+		if e.complexity.Mutation.UpdateArticle == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateArticle_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateArticle(childComplexity, args["input"].(ArticleUpdateInput)), true
+
+	case "Mutation.updateAuthor":
+		if e.complexity.Mutation.UpdateAuthor == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateAuthor_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateAuthor(childComplexity, args["input"].(*AuthorUpdateInput)), true
+
 	case "Query.allArticles":
 		if e.complexity.Query.AllArticles == nil {
 			break
@@ -236,6 +419,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.Author(childComplexity, args["id"].(int)), true
 
+	case "Subscription.articleNotification":
+		if e.complexity.Subscription.ArticleNotification == nil {
+			break
+		}
+
+		return e.complexity.Subscription.ArticleNotification(childComplexity), true
+
+	case "Subscription.authorNotification":
+		if e.complexity.Subscription.AuthorNotification == nil {
+			break
+		}
+
+		return e.complexity.Subscription.AuthorNotification(childComplexity), true
+
 	}
 	return 0, false
 }
@@ -243,7 +440,14 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	rc := graphql.GetOperationContext(ctx)
 	ec := executionContext{rc, e}
-	inputUnmarshalMap := graphql.BuildUnmarshalerMap()
+	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
+		ec.unmarshalInputArticleCreateInput,
+		ec.unmarshalInputArticleDeleteInput,
+		ec.unmarshalInputArticleUpdateInput,
+		ec.unmarshalInputAuthorCreateInput,
+		ec.unmarshalInputAuthorDeleteInput,
+		ec.unmarshalInputAuthorUpdateInput,
+	)
 	first := true
 
 	switch rc.Operation.Operation {
@@ -256,6 +460,38 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			ctx = graphql.WithUnmarshalerMap(ctx, inputUnmarshalMap)
 			data := ec._Query(ctx, rc.Operation.SelectionSet)
 			var buf bytes.Buffer
+			data.MarshalGQL(&buf)
+
+			return &graphql.Response{
+				Data: buf.Bytes(),
+			}
+		}
+	case ast.Mutation:
+		return func(ctx context.Context) *graphql.Response {
+			if !first {
+				return nil
+			}
+			first = false
+			ctx = graphql.WithUnmarshalerMap(ctx, inputUnmarshalMap)
+			data := ec._Mutation(ctx, rc.Operation.SelectionSet)
+			var buf bytes.Buffer
+			data.MarshalGQL(&buf)
+
+			return &graphql.Response{
+				Data: buf.Bytes(),
+			}
+		}
+	case ast.Subscription:
+		next := ec._Subscription(ctx, rc.Operation.SelectionSet)
+
+		var buf bytes.Buffer
+		return func(ctx context.Context) *graphql.Response {
+			buf.Reset()
+			data := next(ctx)
+
+			if data == nil {
+				return nil
+			}
 			data.MarshalGQL(&buf)
 
 			return &graphql.Response{
@@ -291,14 +527,45 @@ var sources = []*ast.Source{
 	{Name: "../schema/article.graphql", Input: `type Article {
      id: ID!
      title: String
-     createAt: Int
+     createdAt: Int
      updatedAt: Int
      deletedAt: Int
+}
+
+input ArticleCreateInput {
+     title: String!
+     authorId: ID!
+}
+
+input ArticleUpdateInput {
+     id: ID!
+     title: String
+}
+
+type ArticlePayload {
+     article: Article!
+}
+
+type ArticleDeletePayload {
+     id: ID!
+}
+
+type ArticlesPayload {
+     articles: [Article!]!
+     total: Int! 
+}
+
+input ArticleDeleteInput {
+     id: ID!
 }`, BuiltIn: false},
-	{Name: "../schema/article_mutations.graphql", Input: ``, BuiltIn: false},
+	{Name: "../schema/article_mutations.graphql", Input: `extend type Mutation {
+     createArticle (input: ArticleCreateInput!): Article!
+     updateArticle (input: ArticleUpdateInput!): Article!
+     deleteArticle (input: ArticleDeleteInput): ArticleDeletePayload!
+}`, BuiltIn: false},
 	{Name: "../schema/article_queries.graphql", Input: `extend type Query {
      article(id: Int!): Article!
-     allArticles: [Article!]!
+     allArticles: ArticlesPayload!
 }`, BuiltIn: false},
 	{Name: "../schema/author.graphql", Input: `type Author {
      id: ID!
@@ -307,15 +574,60 @@ var sources = []*ast.Source{
      username: String
      password: String
      active: Boolean
-     articles: [Article]!
+     articles: [Article]
      createAt: Int
      updatedAt: Int
      deletedAt: Int
+}
+
+input AuthorCreateInput {
+     firstName: String!
+     lastName: String!
+     username: String!
+     password: String!
+     active: Boolean
+}
+
+input AuthorUpdateInput {
+     id: ID!
+     firstName: String
+     lastName: String
+     username: String
+     password: String
+     active: Boolean
+     createdAt: Int
+     updatedAt: Int
+     deletedAt: Int
+}
+
+type AuthorPayload {
+     author: Author!
+}
+
+type AuthorDeletePayload {
+     id: ID!
+}
+
+type AuthorsPayload {
+     authors: [Author!]! 
+     total: Int!   
+}
+
+input AuthorDeleteInput {
+     id: ID!
 }`, BuiltIn: false},
-	{Name: "../schema/author_mutations.graphql", Input: ``, BuiltIn: false},
+	{Name: "../schema/author_mutations.graphql", Input: `extend type Mutation {
+     createAuthor (input: AuthorCreateInput!): Author!
+     updateAuthor (input: AuthorUpdateInput): Author!
+     deleteAuthor (input: AuthorDeleteInput): AuthorDeletePayload!
+}`, BuiltIn: false},
 	{Name: "../schema/author_queries.graphql", Input: `extend type Query {
      author(id: Int!): Author!
-     allAuthors: [Author!]!
+     allAuthors: AuthorsPayload!
+}`, BuiltIn: false},
+	{Name: "../schema/subscriptions.graphql", Input: `extend type Subscription {
+     authorNotification: Author!
+     articleNotification: Article!
 }`, BuiltIn: false},
 }
 var parsedSchema = gqlparser.MustLoadSchema(sources...)
@@ -323,6 +635,96 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
+
+func (ec *executionContext) field_Mutation_createArticle_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 ArticleCreateInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNArticleCreateInput2goᚑtemplateᚋgqlmodelsᚐArticleCreateInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_createAuthor_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 AuthorCreateInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNAuthorCreateInput2goᚑtemplateᚋgqlmodelsᚐAuthorCreateInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_deleteArticle_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *ArticleDeleteInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalOArticleDeleteInput2ᚖgoᚑtemplateᚋgqlmodelsᚐArticleDeleteInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_deleteAuthor_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *AuthorDeleteInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalOAuthorDeleteInput2ᚖgoᚑtemplateᚋgqlmodelsᚐAuthorDeleteInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateArticle_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 ArticleUpdateInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNArticleUpdateInput2goᚑtemplateᚋgqlmodelsᚐArticleUpdateInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateAuthor_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *AuthorUpdateInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalOAuthorUpdateInput2ᚖgoᚑtemplateᚋgqlmodelsᚐAuthorUpdateInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
 
 func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
@@ -492,8 +894,8 @@ func (ec *executionContext) fieldContext_Article_title(ctx context.Context, fiel
 	return fc, nil
 }
 
-func (ec *executionContext) _Article_createAt(ctx context.Context, field graphql.CollectedField, obj *Article) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Article_createAt(ctx, field)
+func (ec *executionContext) _Article_createdAt(ctx context.Context, field graphql.CollectedField, obj *Article) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Article_createdAt(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -506,7 +908,7 @@ func (ec *executionContext) _Article_createAt(ctx context.Context, field graphql
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.CreateAt, nil
+		return obj.CreatedAt, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -520,7 +922,7 @@ func (ec *executionContext) _Article_createAt(ctx context.Context, field graphql
 	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Article_createAt(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Article_createdAt(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Article",
 		Field:      field,
@@ -605,6 +1007,206 @@ func (ec *executionContext) _Article_deletedAt(ctx context.Context, field graphq
 func (ec *executionContext) fieldContext_Article_deletedAt(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Article",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ArticleDeletePayload_id(ctx context.Context, field graphql.CollectedField, obj *ArticleDeletePayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ArticleDeletePayload_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNID2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ArticleDeletePayload_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ArticleDeletePayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ArticlePayload_article(ctx context.Context, field graphql.CollectedField, obj *ArticlePayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ArticlePayload_article(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Article, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*Article)
+	fc.Result = res
+	return ec.marshalNArticle2ᚖgoᚑtemplateᚋgqlmodelsᚐArticle(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ArticlePayload_article(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ArticlePayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Article_id(ctx, field)
+			case "title":
+				return ec.fieldContext_Article_title(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Article_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Article_updatedAt(ctx, field)
+			case "deletedAt":
+				return ec.fieldContext_Article_deletedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Article", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ArticlesPayload_articles(ctx context.Context, field graphql.CollectedField, obj *ArticlesPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ArticlesPayload_articles(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Articles, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*Article)
+	fc.Result = res
+	return ec.marshalNArticle2ᚕᚖgoᚑtemplateᚋgqlmodelsᚐArticleᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ArticlesPayload_articles(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ArticlesPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Article_id(ctx, field)
+			case "title":
+				return ec.fieldContext_Article_title(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Article_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Article_updatedAt(ctx, field)
+			case "deletedAt":
+				return ec.fieldContext_Article_deletedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Article", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ArticlesPayload_total(ctx context.Context, field graphql.CollectedField, obj *ArticlesPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ArticlesPayload_total(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Total, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ArticlesPayload_total(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ArticlesPayload",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -885,14 +1487,11 @@ func (ec *executionContext) _Author_articles(ctx context.Context, field graphql.
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
 	res := resTmp.([]*Article)
 	fc.Result = res
-	return ec.marshalNArticle2ᚕᚖgoᚑtemplateᚋgqlmodelsᚐArticle(ctx, field.Selections, res)
+	return ec.marshalOArticle2ᚕᚖgoᚑtemplateᚋgqlmodelsᚐArticle(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Author_articles(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -907,8 +1506,8 @@ func (ec *executionContext) fieldContext_Author_articles(ctx context.Context, fi
 				return ec.fieldContext_Article_id(ctx, field)
 			case "title":
 				return ec.fieldContext_Article_title(ctx, field)
-			case "createAt":
-				return ec.fieldContext_Article_createAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Article_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Article_updatedAt(ctx, field)
 			case "deletedAt":
@@ -1043,6 +1642,632 @@ func (ec *executionContext) fieldContext_Author_deletedAt(ctx context.Context, f
 	return fc, nil
 }
 
+func (ec *executionContext) _AuthorDeletePayload_id(ctx context.Context, field graphql.CollectedField, obj *AuthorDeletePayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthorDeletePayload_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNID2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthorDeletePayload_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthorDeletePayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthorPayload_author(ctx context.Context, field graphql.CollectedField, obj *AuthorPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthorPayload_author(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Author, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*Author)
+	fc.Result = res
+	return ec.marshalNAuthor2ᚖgoᚑtemplateᚋgqlmodelsᚐAuthor(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthorPayload_author(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthorPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Author_id(ctx, field)
+			case "firstName":
+				return ec.fieldContext_Author_firstName(ctx, field)
+			case "lastName":
+				return ec.fieldContext_Author_lastName(ctx, field)
+			case "username":
+				return ec.fieldContext_Author_username(ctx, field)
+			case "password":
+				return ec.fieldContext_Author_password(ctx, field)
+			case "active":
+				return ec.fieldContext_Author_active(ctx, field)
+			case "articles":
+				return ec.fieldContext_Author_articles(ctx, field)
+			case "createAt":
+				return ec.fieldContext_Author_createAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Author_updatedAt(ctx, field)
+			case "deletedAt":
+				return ec.fieldContext_Author_deletedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Author", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthorsPayload_authors(ctx context.Context, field graphql.CollectedField, obj *AuthorsPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthorsPayload_authors(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Authors, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*Author)
+	fc.Result = res
+	return ec.marshalNAuthor2ᚕᚖgoᚑtemplateᚋgqlmodelsᚐAuthorᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthorsPayload_authors(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthorsPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Author_id(ctx, field)
+			case "firstName":
+				return ec.fieldContext_Author_firstName(ctx, field)
+			case "lastName":
+				return ec.fieldContext_Author_lastName(ctx, field)
+			case "username":
+				return ec.fieldContext_Author_username(ctx, field)
+			case "password":
+				return ec.fieldContext_Author_password(ctx, field)
+			case "active":
+				return ec.fieldContext_Author_active(ctx, field)
+			case "articles":
+				return ec.fieldContext_Author_articles(ctx, field)
+			case "createAt":
+				return ec.fieldContext_Author_createAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Author_updatedAt(ctx, field)
+			case "deletedAt":
+				return ec.fieldContext_Author_deletedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Author", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthorsPayload_total(ctx context.Context, field graphql.CollectedField, obj *AuthorsPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthorsPayload_total(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Total, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthorsPayload_total(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthorsPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_createArticle(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_createArticle(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().CreateArticle(rctx, fc.Args["input"].(ArticleCreateInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*Article)
+	fc.Result = res
+	return ec.marshalNArticle2ᚖgoᚑtemplateᚋgqlmodelsᚐArticle(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_createArticle(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Article_id(ctx, field)
+			case "title":
+				return ec.fieldContext_Article_title(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Article_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Article_updatedAt(ctx, field)
+			case "deletedAt":
+				return ec.fieldContext_Article_deletedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Article", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createArticle_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateArticle(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_updateArticle(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().UpdateArticle(rctx, fc.Args["input"].(ArticleUpdateInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*Article)
+	fc.Result = res
+	return ec.marshalNArticle2ᚖgoᚑtemplateᚋgqlmodelsᚐArticle(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_updateArticle(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Article_id(ctx, field)
+			case "title":
+				return ec.fieldContext_Article_title(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Article_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Article_updatedAt(ctx, field)
+			case "deletedAt":
+				return ec.fieldContext_Article_deletedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Article", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateArticle_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteArticle(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_deleteArticle(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().DeleteArticle(rctx, fc.Args["input"].(*ArticleDeleteInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*ArticleDeletePayload)
+	fc.Result = res
+	return ec.marshalNArticleDeletePayload2ᚖgoᚑtemplateᚋgqlmodelsᚐArticleDeletePayload(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_deleteArticle(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ArticleDeletePayload_id(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ArticleDeletePayload", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteArticle_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_createAuthor(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_createAuthor(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().CreateAuthor(rctx, fc.Args["input"].(AuthorCreateInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*Author)
+	fc.Result = res
+	return ec.marshalNAuthor2ᚖgoᚑtemplateᚋgqlmodelsᚐAuthor(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_createAuthor(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Author_id(ctx, field)
+			case "firstName":
+				return ec.fieldContext_Author_firstName(ctx, field)
+			case "lastName":
+				return ec.fieldContext_Author_lastName(ctx, field)
+			case "username":
+				return ec.fieldContext_Author_username(ctx, field)
+			case "password":
+				return ec.fieldContext_Author_password(ctx, field)
+			case "active":
+				return ec.fieldContext_Author_active(ctx, field)
+			case "articles":
+				return ec.fieldContext_Author_articles(ctx, field)
+			case "createAt":
+				return ec.fieldContext_Author_createAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Author_updatedAt(ctx, field)
+			case "deletedAt":
+				return ec.fieldContext_Author_deletedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Author", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createAuthor_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateAuthor(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_updateAuthor(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().UpdateAuthor(rctx, fc.Args["input"].(*AuthorUpdateInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*Author)
+	fc.Result = res
+	return ec.marshalNAuthor2ᚖgoᚑtemplateᚋgqlmodelsᚐAuthor(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_updateAuthor(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Author_id(ctx, field)
+			case "firstName":
+				return ec.fieldContext_Author_firstName(ctx, field)
+			case "lastName":
+				return ec.fieldContext_Author_lastName(ctx, field)
+			case "username":
+				return ec.fieldContext_Author_username(ctx, field)
+			case "password":
+				return ec.fieldContext_Author_password(ctx, field)
+			case "active":
+				return ec.fieldContext_Author_active(ctx, field)
+			case "articles":
+				return ec.fieldContext_Author_articles(ctx, field)
+			case "createAt":
+				return ec.fieldContext_Author_createAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Author_updatedAt(ctx, field)
+			case "deletedAt":
+				return ec.fieldContext_Author_deletedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Author", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateAuthor_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteAuthor(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_deleteAuthor(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().DeleteAuthor(rctx, fc.Args["input"].(*AuthorDeleteInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*AuthorDeletePayload)
+	fc.Result = res
+	return ec.marshalNAuthorDeletePayload2ᚖgoᚑtemplateᚋgqlmodelsᚐAuthorDeletePayload(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_deleteAuthor(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_AuthorDeletePayload_id(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AuthorDeletePayload", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteAuthor_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_article(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_article(ctx, field)
 	if err != nil {
@@ -1086,8 +2311,8 @@ func (ec *executionContext) fieldContext_Query_article(ctx context.Context, fiel
 				return ec.fieldContext_Article_id(ctx, field)
 			case "title":
 				return ec.fieldContext_Article_title(ctx, field)
-			case "createAt":
-				return ec.fieldContext_Article_createAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Article_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Article_updatedAt(ctx, field)
 			case "deletedAt":
@@ -1136,9 +2361,9 @@ func (ec *executionContext) _Query_allArticles(ctx context.Context, field graphq
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*Article)
+	res := resTmp.(*ArticlesPayload)
 	fc.Result = res
-	return ec.marshalNArticle2ᚕᚖgoᚑtemplateᚋgqlmodelsᚐArticleᚄ(ctx, field.Selections, res)
+	return ec.marshalNArticlesPayload2ᚖgoᚑtemplateᚋgqlmodelsᚐArticlesPayload(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_allArticles(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -1149,18 +2374,12 @@ func (ec *executionContext) fieldContext_Query_allArticles(ctx context.Context, 
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_Article_id(ctx, field)
-			case "title":
-				return ec.fieldContext_Article_title(ctx, field)
-			case "createAt":
-				return ec.fieldContext_Article_createAt(ctx, field)
-			case "updatedAt":
-				return ec.fieldContext_Article_updatedAt(ctx, field)
-			case "deletedAt":
-				return ec.fieldContext_Article_deletedAt(ctx, field)
+			case "articles":
+				return ec.fieldContext_ArticlesPayload_articles(ctx, field)
+			case "total":
+				return ec.fieldContext_ArticlesPayload_total(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type Article", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type ArticlesPayload", field.Name)
 		},
 	}
 	return fc, nil
@@ -1269,9 +2488,9 @@ func (ec *executionContext) _Query_allAuthors(ctx context.Context, field graphql
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*Author)
+	res := resTmp.(*AuthorsPayload)
 	fc.Result = res
-	return ec.marshalNAuthor2ᚕᚖgoᚑtemplateᚋgqlmodelsᚐAuthorᚄ(ctx, field.Selections, res)
+	return ec.marshalNAuthorsPayload2ᚖgoᚑtemplateᚋgqlmodelsᚐAuthorsPayload(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_allAuthors(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -1282,28 +2501,12 @@ func (ec *executionContext) fieldContext_Query_allAuthors(ctx context.Context, f
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_Author_id(ctx, field)
-			case "firstName":
-				return ec.fieldContext_Author_firstName(ctx, field)
-			case "lastName":
-				return ec.fieldContext_Author_lastName(ctx, field)
-			case "username":
-				return ec.fieldContext_Author_username(ctx, field)
-			case "password":
-				return ec.fieldContext_Author_password(ctx, field)
-			case "active":
-				return ec.fieldContext_Author_active(ctx, field)
-			case "articles":
-				return ec.fieldContext_Author_articles(ctx, field)
-			case "createAt":
-				return ec.fieldContext_Author_createAt(ctx, field)
-			case "updatedAt":
-				return ec.fieldContext_Author_updatedAt(ctx, field)
-			case "deletedAt":
-				return ec.fieldContext_Author_deletedAt(ctx, field)
+			case "authors":
+				return ec.fieldContext_AuthorsPayload_authors(ctx, field)
+			case "total":
+				return ec.fieldContext_AuthorsPayload_total(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type Author", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type AuthorsPayload", field.Name)
 		},
 	}
 	return fc, nil
@@ -1433,6 +2636,156 @@ func (ec *executionContext) fieldContext_Query___schema(ctx context.Context, fie
 				return ec.fieldContext___Schema_directives(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type __Schema", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_authorNotification(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	fc, err := ec.fieldContext_Subscription_authorNotification(ctx, field)
+	if err != nil {
+		return nil
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = nil
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Subscription().AuthorNotification(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return nil
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return nil
+	}
+	return func(ctx context.Context) graphql.Marshaler {
+		select {
+		case res, ok := <-resTmp.(<-chan *Author):
+			if !ok {
+				return nil
+			}
+			return graphql.WriterFunc(func(w io.Writer) {
+				w.Write([]byte{'{'})
+				graphql.MarshalString(field.Alias).MarshalGQL(w)
+				w.Write([]byte{':'})
+				ec.marshalNAuthor2ᚖgoᚑtemplateᚋgqlmodelsᚐAuthor(ctx, field.Selections, res).MarshalGQL(w)
+				w.Write([]byte{'}'})
+			})
+		case <-ctx.Done():
+			return nil
+		}
+	}
+}
+
+func (ec *executionContext) fieldContext_Subscription_authorNotification(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Author_id(ctx, field)
+			case "firstName":
+				return ec.fieldContext_Author_firstName(ctx, field)
+			case "lastName":
+				return ec.fieldContext_Author_lastName(ctx, field)
+			case "username":
+				return ec.fieldContext_Author_username(ctx, field)
+			case "password":
+				return ec.fieldContext_Author_password(ctx, field)
+			case "active":
+				return ec.fieldContext_Author_active(ctx, field)
+			case "articles":
+				return ec.fieldContext_Author_articles(ctx, field)
+			case "createAt":
+				return ec.fieldContext_Author_createAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Author_updatedAt(ctx, field)
+			case "deletedAt":
+				return ec.fieldContext_Author_deletedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Author", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_articleNotification(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	fc, err := ec.fieldContext_Subscription_articleNotification(ctx, field)
+	if err != nil {
+		return nil
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = nil
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Subscription().ArticleNotification(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return nil
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return nil
+	}
+	return func(ctx context.Context) graphql.Marshaler {
+		select {
+		case res, ok := <-resTmp.(<-chan *Article):
+			if !ok {
+				return nil
+			}
+			return graphql.WriterFunc(func(w io.Writer) {
+				w.Write([]byte{'{'})
+				graphql.MarshalString(field.Alias).MarshalGQL(w)
+				w.Write([]byte{':'})
+				ec.marshalNArticle2ᚖgoᚑtemplateᚋgqlmodelsᚐArticle(ctx, field.Selections, res).MarshalGQL(w)
+				w.Write([]byte{'}'})
+			})
+		case <-ctx.Done():
+			return nil
+		}
+	}
+}
+
+func (ec *executionContext) fieldContext_Subscription_articleNotification(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Article_id(ctx, field)
+			case "title":
+				return ec.fieldContext_Article_title(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Article_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Article_updatedAt(ctx, field)
+			case "deletedAt":
+				return ec.fieldContext_Article_deletedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Article", field.Name)
 		},
 	}
 	return fc, nil
@@ -3211,6 +4564,286 @@ func (ec *executionContext) fieldContext___Type_specifiedByURL(ctx context.Conte
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputArticleCreateInput(ctx context.Context, obj interface{}) (ArticleCreateInput, error) {
+	var it ArticleCreateInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"title", "authorId"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "title":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("title"))
+			it.Title, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "authorId":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("authorId"))
+			it.AuthorID, err = ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputArticleDeleteInput(ctx context.Context, obj interface{}) (ArticleDeleteInput, error) {
+	var it ArticleDeleteInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"id"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "id":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+			it.ID, err = ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputArticleUpdateInput(ctx context.Context, obj interface{}) (ArticleUpdateInput, error) {
+	var it ArticleUpdateInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"id", "title"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "id":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+			it.ID, err = ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "title":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("title"))
+			it.Title, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputAuthorCreateInput(ctx context.Context, obj interface{}) (AuthorCreateInput, error) {
+	var it AuthorCreateInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"firstName", "lastName", "username", "password", "active"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "firstName":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("firstName"))
+			it.FirstName, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "lastName":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("lastName"))
+			it.LastName, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "username":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("username"))
+			it.Username, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "password":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("password"))
+			it.Password, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "active":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("active"))
+			it.Active, err = ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputAuthorDeleteInput(ctx context.Context, obj interface{}) (AuthorDeleteInput, error) {
+	var it AuthorDeleteInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"id"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "id":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+			it.ID, err = ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputAuthorUpdateInput(ctx context.Context, obj interface{}) (AuthorUpdateInput, error) {
+	var it AuthorUpdateInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"id", "firstName", "lastName", "username", "password", "active", "createdAt", "updatedAt", "deletedAt"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "id":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+			it.ID, err = ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "firstName":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("firstName"))
+			it.FirstName, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "lastName":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("lastName"))
+			it.LastName, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "username":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("username"))
+			it.Username, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "password":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("password"))
+			it.Password, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "active":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("active"))
+			it.Active, err = ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "createdAt":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("createdAt"))
+			it.CreatedAt, err = ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "updatedAt":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("updatedAt"))
+			it.UpdatedAt, err = ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "deletedAt":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("deletedAt"))
+			it.DeletedAt, err = ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 // endregion **************************** input.gotpl *****************************
 
 // region    ************************** interface.gotpl ***************************
@@ -3240,9 +4873,9 @@ func (ec *executionContext) _Article(ctx context.Context, sel ast.SelectionSet, 
 
 			out.Values[i] = ec._Article_title(ctx, field, obj)
 
-		case "createAt":
+		case "createdAt":
 
-			out.Values[i] = ec._Article_createAt(ctx, field, obj)
+			out.Values[i] = ec._Article_createdAt(ctx, field, obj)
 
 		case "updatedAt":
 
@@ -3252,6 +4885,97 @@ func (ec *executionContext) _Article(ctx context.Context, sel ast.SelectionSet, 
 
 			out.Values[i] = ec._Article_deletedAt(ctx, field, obj)
 
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var articleDeletePayloadImplementors = []string{"ArticleDeletePayload"}
+
+func (ec *executionContext) _ArticleDeletePayload(ctx context.Context, sel ast.SelectionSet, obj *ArticleDeletePayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, articleDeletePayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ArticleDeletePayload")
+		case "id":
+
+			out.Values[i] = ec._ArticleDeletePayload_id(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var articlePayloadImplementors = []string{"ArticlePayload"}
+
+func (ec *executionContext) _ArticlePayload(ctx context.Context, sel ast.SelectionSet, obj *ArticlePayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, articlePayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ArticlePayload")
+		case "article":
+
+			out.Values[i] = ec._ArticlePayload_article(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var articlesPayloadImplementors = []string{"ArticlesPayload"}
+
+func (ec *executionContext) _ArticlesPayload(ctx context.Context, sel ast.SelectionSet, obj *ArticlesPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, articlesPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ArticlesPayload")
+		case "articles":
+
+			out.Values[i] = ec._ArticlesPayload_articles(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "total":
+
+			out.Values[i] = ec._ArticlesPayload_total(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -3304,9 +5028,6 @@ func (ec *executionContext) _Author(ctx context.Context, sel ast.SelectionSet, o
 
 			out.Values[i] = ec._Author_articles(ctx, field, obj)
 
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
 		case "createAt":
 
 			out.Values[i] = ec._Author_createAt(ctx, field, obj)
@@ -3319,6 +5040,181 @@ func (ec *executionContext) _Author(ctx context.Context, sel ast.SelectionSet, o
 
 			out.Values[i] = ec._Author_deletedAt(ctx, field, obj)
 
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var authorDeletePayloadImplementors = []string{"AuthorDeletePayload"}
+
+func (ec *executionContext) _AuthorDeletePayload(ctx context.Context, sel ast.SelectionSet, obj *AuthorDeletePayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, authorDeletePayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AuthorDeletePayload")
+		case "id":
+
+			out.Values[i] = ec._AuthorDeletePayload_id(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var authorPayloadImplementors = []string{"AuthorPayload"}
+
+func (ec *executionContext) _AuthorPayload(ctx context.Context, sel ast.SelectionSet, obj *AuthorPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, authorPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AuthorPayload")
+		case "author":
+
+			out.Values[i] = ec._AuthorPayload_author(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var authorsPayloadImplementors = []string{"AuthorsPayload"}
+
+func (ec *executionContext) _AuthorsPayload(ctx context.Context, sel ast.SelectionSet, obj *AuthorsPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, authorsPayloadImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AuthorsPayload")
+		case "authors":
+
+			out.Values[i] = ec._AuthorsPayload_authors(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "total":
+
+			out.Values[i] = ec._AuthorsPayload_total(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var mutationImplementors = []string{"Mutation"}
+
+func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, mutationImplementors)
+	ctx = graphql.WithFieldContext(ctx, &graphql.FieldContext{
+		Object: "Mutation",
+	})
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		innerCtx := graphql.WithRootFieldContext(ctx, &graphql.RootFieldContext{
+			Object: field.Name,
+			Field:  field,
+		})
+
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Mutation")
+		case "createArticle":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createArticle(ctx, field)
+			})
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "updateArticle":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateArticle(ctx, field)
+			})
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "deleteArticle":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteArticle(ctx, field)
+			})
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "createAuthor":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createAuthor(ctx, field)
+			})
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "updateAuthor":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateAuthor(ctx, field)
+			})
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "deleteAuthor":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteAuthor(ctx, field)
+			})
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -3462,6 +5358,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 		return graphql.Null
 	}
 	return out
+}
+
+var subscriptionImplementors = []string{"Subscription"}
+
+func (ec *executionContext) _Subscription(ctx context.Context, sel ast.SelectionSet) func(ctx context.Context) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, subscriptionImplementors)
+	ctx = graphql.WithFieldContext(ctx, &graphql.FieldContext{
+		Object: "Subscription",
+	})
+	if len(fields) != 1 {
+		ec.Errorf(ctx, "must subscribe to exactly one stream")
+		return nil
+	}
+
+	switch fields[0].Name {
+	case "authorNotification":
+		return ec._Subscription_authorNotification(ctx, fields[0])
+	case "articleNotification":
+		return ec._Subscription_articleNotification(ctx, fields[0])
+	default:
+		panic("unknown field " + strconv.Quote(fields[0].Name))
+	}
 }
 
 var __DirectiveImplementors = []string{"__Directive"}
@@ -3786,44 +5704,6 @@ func (ec *executionContext) marshalNArticle2goᚑtemplateᚋgqlmodelsᚐArticle(
 	return ec._Article(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNArticle2ᚕᚖgoᚑtemplateᚋgqlmodelsᚐArticle(ctx context.Context, sel ast.SelectionSet, v []*Article) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalOArticle2ᚖgoᚑtemplateᚋgqlmodelsᚐArticle(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-
-	return ret
-}
-
 func (ec *executionContext) marshalNArticle2ᚕᚖgoᚑtemplateᚋgqlmodelsᚐArticleᚄ(ctx context.Context, sel ast.SelectionSet, v []*Article) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
@@ -3876,6 +5756,44 @@ func (ec *executionContext) marshalNArticle2ᚖgoᚑtemplateᚋgqlmodelsᚐArtic
 		return graphql.Null
 	}
 	return ec._Article(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNArticleCreateInput2goᚑtemplateᚋgqlmodelsᚐArticleCreateInput(ctx context.Context, v interface{}) (ArticleCreateInput, error) {
+	res, err := ec.unmarshalInputArticleCreateInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNArticleDeletePayload2goᚑtemplateᚋgqlmodelsᚐArticleDeletePayload(ctx context.Context, sel ast.SelectionSet, v ArticleDeletePayload) graphql.Marshaler {
+	return ec._ArticleDeletePayload(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNArticleDeletePayload2ᚖgoᚑtemplateᚋgqlmodelsᚐArticleDeletePayload(ctx context.Context, sel ast.SelectionSet, v *ArticleDeletePayload) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ArticleDeletePayload(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNArticleUpdateInput2goᚑtemplateᚋgqlmodelsᚐArticleUpdateInput(ctx context.Context, v interface{}) (ArticleUpdateInput, error) {
+	res, err := ec.unmarshalInputArticleUpdateInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNArticlesPayload2goᚑtemplateᚋgqlmodelsᚐArticlesPayload(ctx context.Context, sel ast.SelectionSet, v ArticlesPayload) graphql.Marshaler {
+	return ec._ArticlesPayload(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNArticlesPayload2ᚖgoᚑtemplateᚋgqlmodelsᚐArticlesPayload(ctx context.Context, sel ast.SelectionSet, v *ArticlesPayload) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ArticlesPayload(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNAuthor2goᚑtemplateᚋgqlmodelsᚐAuthor(ctx context.Context, sel ast.SelectionSet, v Author) graphql.Marshaler {
@@ -3934,6 +5852,39 @@ func (ec *executionContext) marshalNAuthor2ᚖgoᚑtemplateᚋgqlmodelsᚐAuthor
 		return graphql.Null
 	}
 	return ec._Author(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNAuthorCreateInput2goᚑtemplateᚋgqlmodelsᚐAuthorCreateInput(ctx context.Context, v interface{}) (AuthorCreateInput, error) {
+	res, err := ec.unmarshalInputAuthorCreateInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNAuthorDeletePayload2goᚑtemplateᚋgqlmodelsᚐAuthorDeletePayload(ctx context.Context, sel ast.SelectionSet, v AuthorDeletePayload) graphql.Marshaler {
+	return ec._AuthorDeletePayload(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNAuthorDeletePayload2ᚖgoᚑtemplateᚋgqlmodelsᚐAuthorDeletePayload(ctx context.Context, sel ast.SelectionSet, v *AuthorDeletePayload) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AuthorDeletePayload(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNAuthorsPayload2goᚑtemplateᚋgqlmodelsᚐAuthorsPayload(ctx context.Context, sel ast.SelectionSet, v AuthorsPayload) graphql.Marshaler {
+	return ec._AuthorsPayload(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNAuthorsPayload2ᚖgoᚑtemplateᚋgqlmodelsᚐAuthorsPayload(ctx context.Context, sel ast.SelectionSet, v *AuthorsPayload) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AuthorsPayload(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v interface{}) (bool, error) {
@@ -4249,11 +6200,76 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 	return res
 }
 
+func (ec *executionContext) marshalOArticle2ᚕᚖgoᚑtemplateᚋgqlmodelsᚐArticle(ctx context.Context, sel ast.SelectionSet, v []*Article) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOArticle2ᚖgoᚑtemplateᚋgqlmodelsᚐArticle(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
+}
+
 func (ec *executionContext) marshalOArticle2ᚖgoᚑtemplateᚋgqlmodelsᚐArticle(ctx context.Context, sel ast.SelectionSet, v *Article) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._Article(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOArticleDeleteInput2ᚖgoᚑtemplateᚋgqlmodelsᚐArticleDeleteInput(ctx context.Context, v interface{}) (*ArticleDeleteInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputArticleDeleteInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalOAuthorDeleteInput2ᚖgoᚑtemplateᚋgqlmodelsᚐAuthorDeleteInput(ctx context.Context, v interface{}) (*AuthorDeleteInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputAuthorDeleteInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalOAuthorUpdateInput2ᚖgoᚑtemplateᚋgqlmodelsᚐAuthorUpdateInput(ctx context.Context, v interface{}) (*AuthorUpdateInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputAuthorUpdateInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalOBoolean2bool(ctx context.Context, v interface{}) (bool, error) {

@@ -11,12 +11,10 @@ import (
 	graphql "go-template/gqlmodels"
 	"go-template/internal/config"
 	// "go-template/pkg/utl/zaplog"
-
 	// "go-template/internal/jwt"
 	// authMw "go-template/internal/middleware/auth"
 	"go-template/internal/mysql"
 	"go-template/internal/server"
-
 	// throttle "go-template/pkg/utl/throttle"
 	"go-template/resolver"
 
@@ -29,7 +27,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
 	_ "github.com/lib/pq" // here
-
 	"github.com/volatiletech/sqlboiler/v4/boil"
 )
 
@@ -62,11 +59,14 @@ func Start(cfg *config.Configuration) (*echo.Echo, error) {
 	graphQLPathname := "/graphql"
 	playgroundHandler := playground.Handler("GraphQL playground", graphQLPathname)
 
-	// observers := map[string]chan *graphql.User{}
 	observers := map[string]chan *graphql.Author{}
+	observer2 := map[string]chan *graphql.Article{}
 
 	graphqlHandler := handler.New(graphql.NewExecutableSchema(graphql.Config{
-		Resolvers: &resolver.Resolver{Observers: observers},
+		Resolvers: &resolver.Resolver{
+			Observers: observers,
+			Observers2: observer2,
+		},
 	}))
 
 	if os.Getenv("ENVIRONMENT_NAME") == "local" {
@@ -99,7 +99,6 @@ func Start(cfg *config.Configuration) (*echo.Echo, error) {
 			},
 		},
 	})
-
 	graphqlHandler.AddTransport(transport.Options{})
 	graphqlHandler.AddTransport(transport.GET{})
 	graphqlHandler.AddTransport(transport.POST{})

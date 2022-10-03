@@ -12,4 +12,5 @@ import (
 type Resolver struct{
      sync.Mutex
      Observers map[string]chan *gqlmodels.Author
+     Observers2 map[string]chan *gqlmodels.Article
 }
