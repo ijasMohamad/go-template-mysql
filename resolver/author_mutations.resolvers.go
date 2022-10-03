@@ -1,0 +1,126 @@
+package resolver
+
+// This file will be automatically regenerated based on the schema, any resolver implementations
+// will be copied through when generating and any unknown code will be moved to the end.
+
+import (
+	"context"
+	"fmt"
+	"go-template/daos"
+	"go-template/gqlmodels"
+	"go-template/internal/config"
+	"go-template/internal/service"
+	"go-template/models"
+	"go-template/pkg/utl/cnvrttogql"
+	"strconv"
+
+	null "github.com/volatiletech/null/v8"
+)
+
+// CreateAuthor is the resolver for the createAuthor field.
+func (r *mutationResolver) CreateAuthor(ctx context.Context, input gqlmodels.AuthorCreateInput) (*gqlmodels.Author, error) {
+	active := null.NewBool(false, false)
+	if input.Active != nil {
+		active = null.BoolFrom(*input.Active)
+	}
+	author := models.Author{
+		FirstName: null.StringFrom(input.FirstName),
+		LastName:  null.StringFrom(input.LastName),
+		Username:  null.StringFrom(input.Username),
+		Password:  null.StringFrom(input.Password),
+		Active:    active,
+	}
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, fmt.Errorf("Error in loading config")
+	}
+	sec := service.Secure(cfg)
+	author.Password = null.StringFrom(sec.Hash(author.Password.String))
+
+	// daos..
+	newAuthor, err := daos.CreateAuthor(author, ctx)
+	if err != nil {
+		return nil, err
+	}
+	graphqlAuthor := cnvrttogql.AuthorToGraphQLAuthor(&newAuthor)
+
+	// r.Lock()
+	// for _, observer := range r.Observers {
+	// 	observer <- graphqlAuthor
+	// }
+	// r.Unlock()
+
+	return graphqlAuthor, nil
+}
+
+// UpdateAuthor is the resolver for the updateAuthor field.
+func (r *mutationResolver) UpdateAuthor(ctx context.Context, input *gqlmodels.AuthorUpdateInput) (*gqlmodels.Author, error) {
+	authorID, err := strconv.Atoi(input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// daos..
+	author, err := daos.FindAuthorById(authorID, ctx)
+	if err != nil {
+		return nil, err
+	}
+	var a models.Author
+	if author != nil {
+		a = *author
+	}
+	if input.FirstName != nil {
+		a.FirstName = null.StringFrom(*input.FirstName)
+	}
+	if input.LastName != nil {
+		a.LastName = null.StringFrom(*input.LastName)
+	}
+	if input.Username != nil {
+		a.Username = null.StringFrom(*input.Username)
+	}
+	if input.Active != nil {
+		a.Active = null.BoolFrom(*input.Active)
+	}
+	if input.Password != nil {
+		cfg, err := config.Load()
+		if err != nil {
+			return nil, fmt.Errorf("Error in loading config")
+		}
+		sec := service.Secure(cfg)
+		a.Password = null.StringFrom(sec.Hash(*input.Password))
+	}
+	// daos...
+	_, err = daos.UpdateAuthor(a, ctx)
+	if err != nil {
+		return nil, err
+	}
+	graphqlAuthor := cnvrttogql.AuthorToGraphQLAuthor(&a)
+
+	// r.Lock()
+	// for _, observer := range r.Observers {
+	// 	observer <- graphqlAuthor
+	// }
+	// r.Unlock()
+
+	return graphqlAuthor, nil
+}
+
+// DeleteAuthor is the resolver for the deleteAuthor field.
+func (r *mutationResolver) DeleteAuthor(ctx context.Context, input *gqlmodels.AuthorDeleteInput) (*gqlmodels.AuthorDeletePayload, error) {
+	//nolint
+	authorID, err := strconv.Atoi(input.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// daos..
+	author, err := daos.FindAuthorById(authorID, ctx)
+	if err != nil {
+		return nil, err
+	}
+	_, err = daos.DeleteAuthor(*author, ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &gqlmodels.AuthorDeletePayload{ID: input.ID}, nil
+}
