@@ -3,13 +3,14 @@ package resolver_test
 import (
 	"context"
 	"database/sql/driver"
-	"fmt"
+	"fmt"	
+     "regexp"
+	"testing"
+
 	"go-template/gqlmodels"
 	"go-template/pkg/utl/convert"
 	"go-template/resolver"
 	"go-template/testutls"
-	"regexp"
-	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"

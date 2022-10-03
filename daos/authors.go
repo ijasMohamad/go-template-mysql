@@ -2,7 +2,6 @@ package daos
 
 import (
 	"context"
-	"database/sql"
 	"go-template/models"
 
 	"github.com/volatiletech/sqlboiler/v4/boil"
@@ -32,21 +31,13 @@ func FindAllAuthorsWithCount (ctx context.Context) (models.AuthorSlice, int, err
 // Author mutations...
 
 func CreateAuthor (author models.Author, ctx context.Context) (models.Author, error) {
-     return CreateAuthorTx(author, ctx, nil)
-}
-
-func CreateAuthorTx (author models.Author, ctx context.Context, tx *sql.Tx) (models.Author, error) {
-     var contextExecutor = getContextExecutor(tx)
+     contextExecutor := getContextExecutor(nil)
      err := author.Insert(ctx, contextExecutor, boil.Infer())
      return author, err
 }
 
 func UpdateAuthor (author models.Author, ctx context.Context) (models.Author, error) {
-     return UpdateAuthorTx(author, ctx, nil)
-}
-
-func UpdateAuthorTx (author models.Author, ctx context.Context, tx *sql.Tx) (models.Author, error) {
-     var contextExecutor = getContextExecutor(tx)
+     contextExecutor := getContextExecutor(nil)
      _, err := author.Update(ctx, contextExecutor, boil.Infer())
      return author, err
 }

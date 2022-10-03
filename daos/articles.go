@@ -2,7 +2,6 @@ package daos
 
 import (
 	"context"
-	"database/sql"
 	"go-template/models"
 
 	"github.com/volatiletech/sqlboiler/v4/boil"
@@ -11,21 +10,13 @@ import (
 // Article Mutations....
 
 func CreateArticle(article models.Article, ctx context.Context) (models.Article, error) {
-	return CreateArticleTx(article, ctx, nil)
-}
-
-func CreateArticleTx(article models.Article, ctx context.Context, tx *sql.Tx) (models.Article, error) {
-	contextExecutor := getContextExecutor(tx)
+	contextExecutor := getContextExecutor(nil)
 	err := article.Insert(ctx, contextExecutor, boil.Infer())
 	return article, err
 }
 
 func UpdateArticle(article models.Article, ctx context.Context) (models.Article, error) {
-	return UpdateArticleTx(article, ctx, nil)
-}
-
-func UpdateArticleTx(article models.Article, ctx context.Context, tx *sql.Tx) (models.Article, error) {
-	contextExecutor := getContextExecutor(tx)
+	contextExecutor := getContextExecutor(nil)
 	_, err := article.Update(ctx, contextExecutor, boil.Infer())
 	return article, err
 }
