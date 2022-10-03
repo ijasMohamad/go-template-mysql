@@ -5,18 +5,14 @@ package resolver
 
 import (
 	"context"
+	"go-template/daos"
 	"go-template/gqlmodels"
-	"go-template/models"
 	"go-template/pkg/utl/cnvrttogql"
-
-	"github.com/volatiletech/sqlboiler/v4/boil"
 )
 
 // Author is the resolver for the author field.
 func (r *queryResolver) Author(ctx context.Context, id int) (*gqlmodels.Author, error) {
-	var contextExecutor = boil.GetContextDB()
-
-	author, err := models.FindAuthor(ctx, contextExecutor, id)
+	author, err := daos.FindAuthorById(id, ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -24,11 +20,13 @@ func (r *queryResolver) Author(ctx context.Context, id int) (*gqlmodels.Author, 
 }
 
 // AllAuthors is the resolver for the allAuthors field.
-func (r *queryResolver) AllAuthors(ctx context.Context) ([]*gqlmodels.Author, error) {
-	var contextExecutor = boil.GetContextDB()
-	authors, err := models.Authors().All(ctx, contextExecutor)
+func (r *queryResolver) AllAuthors(ctx context.Context) (*gqlmodels.AuthorsPayload, error) {
+	authors, count, err := daos.FindAllAuthorsWithCount(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return cnvrttogql.AuthorsToGraphQLAuthors(authors), nil
+	graphqlAuthor := cnvrttogql.AuthorsToGraphQLAuthors(authors)
+	return &gqlmodels.AuthorsPayload{
+		Authors: graphqlAuthor,
+		Total:   count}, nil
 }
