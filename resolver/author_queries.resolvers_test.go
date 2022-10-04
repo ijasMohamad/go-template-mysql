@@ -35,7 +35,7 @@ func TestAuthor(t *testing.T) {
                     FirstName: convert.NullDotStringToPointerString(testutls.MockAuthor().FirstName),
                     LastName: convert.NullDotStringToPointerString(testutls.MockAuthor().LastName),
                     Username: convert.NullDotStringToPointerString(testutls.MockAuthor().Username),
-                    Active: convert.NullDotBoolToPointerBool(testutls.MockAuthor().Active),
+                    // Active: convert.NullDotBoolToPointerBool(testutls.MockAuthor().Active),
                },
           },
      }
@@ -62,13 +62,11 @@ func TestAuthor(t *testing.T) {
                     
                     // get author by id
                     rows := sqlmock.NewRows([]string{"id", "first_name", "last_name", "username", "active"}).
-                                   AddRow(1, "First", "Last", "username", false)
+                                   AddRow(1, "First", "Last", "username", nil)
                     mock.ExpectQuery(regexp.QuoteMeta("select * from `authors` where `id`=?")).
                          WithArgs(1).
                          WillReturnRows(rows)
 
-                    
-                    
                     c := context.Background()
                     ctx := context.WithValue(c, testutls.AuthorKey, testutls.MockAuthor())
                     response, err := resolver1.Query().Author(ctx, 1)
@@ -76,7 +74,7 @@ func TestAuthor(t *testing.T) {
                     fmt.Printf("err: %v\n\n", err)
 
                     if tt.wantResp != nil && response != nil {
-                         assert.Equal(t, tt.wantResp, response)
+                         assert.EqualValues(t, tt.wantResp, response)
                     }
                     assert.Equal(t, tt.wantErr, err != nil)
                },

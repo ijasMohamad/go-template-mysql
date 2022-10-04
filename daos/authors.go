@@ -2,6 +2,7 @@ package daos
 
 import (
 	"context"
+	"fmt"
 	"go-template/models"
 
 	"github.com/volatiletech/sqlboiler/v4/boil"
@@ -33,6 +34,7 @@ func FindAllAuthorsWithCount (ctx context.Context) (models.AuthorSlice, int, err
 func CreateAuthor (author models.Author, ctx context.Context) (models.Author, error) {
      contextExecutor := getContextExecutor(nil)
      err := author.Insert(ctx, contextExecutor, boil.Infer())
+     fmt.Println("Error in doas package: ", err)
      return author, err
 }
 

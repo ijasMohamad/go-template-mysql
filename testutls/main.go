@@ -35,6 +35,7 @@ func MockAuthor() *models.Author {
           FirstName: null.StringFrom("First"),
           LastName: null.StringFrom("Last"),
           Username: null.StringFrom("username"),
+          // Password: null.StringFrom("password"),
           // Active: null.BoolFrom(false),
      }
 }
