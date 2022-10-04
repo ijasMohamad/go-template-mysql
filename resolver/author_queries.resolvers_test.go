@@ -29,13 +29,11 @@ func TestAuthor(t *testing.T) {
                name: "Success",
                req: 1,
                wantErr: false,
-               // wantResp: testutls.MockGqlAuthor(),
                wantResp: &gqlmodels.Author{
                     ID: strconv.Itoa(testutls.MockAuthor().ID),
                     FirstName: convert.NullDotStringToPointerString(testutls.MockAuthor().FirstName),
                     LastName: convert.NullDotStringToPointerString(testutls.MockAuthor().LastName),
                     Username: convert.NullDotStringToPointerString(testutls.MockAuthor().Username),
-                    // Active: convert.NullDotBoolToPointerBool(testutls.MockAuthor().Active),
                },
           },
      }
@@ -122,7 +120,6 @@ func TestAllAuthors(t *testing.T) {
                               ).
                               AddRow(testutls.MockID, "First", "Last", "username")
 
-                              // TESTING..
                               Query := regexp.QuoteMeta("SELECT `authors`.* FROM `authors`;")
                               fmt.Println("Query all: ", Query)
 

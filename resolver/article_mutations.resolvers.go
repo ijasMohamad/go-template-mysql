@@ -31,12 +31,6 @@ func (r *mutationResolver) CreateArticle(ctx context.Context, input gqlmodels.Ar
 	}
 	graphArticle := cnvrttogql.ArticleToGraphQLArticle(&newArticle)
 
-	// r.Lock()
-	// for _, observer := range r.Observers2 {
-	// 	observer <- graphArticle
-	// }
-	// r.Unlock()
-
 	return graphArticle, nil
 }
 
@@ -70,11 +64,6 @@ func (r *mutationResolver) UpdateArticle(ctx context.Context, input gqlmodels.Ar
 	}
 	graphArticle := cnvrttogql.ArticleToGraphQLArticle(&a)
 	fmt.Println("graphArticle: ", graphArticle)
-	// r.Lock()
-	// for _, observer := range r.Observers2 {
-	// 	observer <- graphArticle
-	// }
-	// r.Unlock()
 
 	return graphArticle, nil
 }

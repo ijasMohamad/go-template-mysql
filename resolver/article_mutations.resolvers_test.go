@@ -44,9 +44,6 @@ func TestCreateArticle(t *testing.T) {
 			wantResp: &gqlmodels.Article{
 				ID:    fmt.Sprint(testutls.MockArticle().ID),
 				Title: convert.NullDotStringToPointerString(testutls.MockArticle().Title),
-				// CreatedAt: convert.NullDotTimeToPointerInt(testutls.MockArticle().CreatedAt),
-				// UpdatedAt: convert.NullDotTimeToPointerInt(testutls.MockArticle().UpdatedAt),
-				// DeletedAt: convert.NullDotTimeToPointerInt(testutls.MockArticle().DeletedAt),
 			},
 			wantErr: false,
 		},
