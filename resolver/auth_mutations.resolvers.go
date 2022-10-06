@@ -11,12 +11,11 @@ import (
 	"go-template/internal/config"
 	"go-template/internal/service"
 
-	"github.com/volatiletech/null/v8"
+	null "github.com/volatiletech/null/v8"
 )
 
 // Login is the resolver for the login field.
 func (r *mutationResolver) Login(ctx context.Context, username string, password string) (*gqlmodels.LoginResponse, error) {
-
 	author, err := daos.FindAuthorByUsername(username, ctx)
 	if err != nil {
 		return nil, err
@@ -27,7 +26,7 @@ func (r *mutationResolver) Login(ctx context.Context, username string, password 
 		return nil, err
 	}
 	// creating new secure and token generation service
-	sec := service.Secure(cfg) 
+	sec := service.Secure(cfg)
 	tg, err := service.JWT(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("error in creating auth services")
@@ -50,7 +49,7 @@ func (r *mutationResolver) Login(ctx context.Context, username string, password 
 		return nil, fmt.Errorf("error in updating author")
 	}
 	return &gqlmodels.LoginResponse{
-		Token: token,
+		Token:        token,
 		RefreshToken: refreshToken,
 	}, nil
 }

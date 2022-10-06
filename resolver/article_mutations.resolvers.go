@@ -69,7 +69,8 @@ func (r *mutationResolver) UpdateArticle(ctx context.Context, input gqlmodels.Ar
 }
 
 // DeleteArticle is the resolver for the deleteArticle field.
-func (r *mutationResolver) DeleteArticle(ctx context.Context, input *gqlmodels.ArticleDeleteInput) (*gqlmodels.ArticleDeletePayload, error) { //nolint
+func (r *mutationResolver) DeleteArticle(ctx context.Context, input *gqlmodels.ArticleDeleteInput) (*gqlmodels.ArticleDeletePayload, error) {
+	//nolint
 
 	articleID, err := strconv.Atoi(input.ID)
 	if err != nil {

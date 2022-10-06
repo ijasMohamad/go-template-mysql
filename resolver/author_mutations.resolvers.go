@@ -29,6 +29,7 @@ func (r *mutationResolver) CreateAuthor(ctx context.Context, input gqlmodels.Aut
 		Username:  null.StringFrom(input.Username),
 		Password:  null.StringFrom(input.Password),
 		Active:    active,
+		Role: null.StringFrom(input.Role),
 	}
 	cfg, err := config.Load()
 	if err != nil {
@@ -104,23 +105,4 @@ func (r *mutationResolver) UpdateAuthor(ctx context.Context, input *gqlmodels.Au
 	graphqlAuthor := cnvrttogql.AuthorToGraphQLAuthor(&a)
 
 	return graphqlAuthor, nil
-}
-
-// DeleteAuthor is the resolver for the deleteAuthor field.
-func (r *mutationResolver) DeleteAuthor(ctx context.Context, input *gqlmodels.AuthorDeleteInput) (*gqlmodels.AuthorDeletePayload, error) { //nolint
-	authorID, err := strconv.Atoi(input.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	// daos..
-	author, err := daos.FindAuthorById(authorID, ctx)
-	if err != nil {
-		return nil, err
-	}
-	_, err = daos.DeleteAuthor(*author, ctx)
-	if err != nil {
-		return nil, err
-	}
-	return &gqlmodels.AuthorDeletePayload{ID: input.ID}, nil
 }
