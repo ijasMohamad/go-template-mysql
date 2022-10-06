@@ -1,0 +1,4 @@
+extend type Subscription {
+     authorNotification: Author!
+     articleNotification: Article!
+}

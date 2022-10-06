@@ -5,8 +5,51 @@ type Author {
      username: String
      password: String
      active: Boolean
-     articles: [Article]!
+     articles: [Article]
      createAt: Int
      updatedAt: Int
      deletedAt: Int
+     token: String
+}
+
+input AuthorCreateInput {
+     firstName: String!
+     lastName: String!
+     username: String!
+     password: String!
+     active: Boolean
+}
+
+input AuthorUpdateInput {
+     id: ID!
+     firstName: String
+     lastName: String
+     username: String
+     password: String
+     active: Boolean
+     createdAt: Int
+     updatedAt: Int
+     deletedAt: Int
+}
+
+type AuthorPayload {
+     author: Author!
+}
+
+type AuthorDeletePayload {
+     id: ID!
+}
+
+type AuthorsPayload {
+     authors: [Author!]! 
+     total: Int!   
+}
+
+input AuthorDeleteInput {
+     id: ID!
+}
+
+type LoginResponse {
+     token: String!
+     refreshToken: String!
 }

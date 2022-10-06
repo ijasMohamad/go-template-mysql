@@ -2,6 +2,7 @@
 package api
 
 import (
+	// "context"
 	"context"
 	"fmt"
 	"net/http"
@@ -11,11 +12,10 @@ import (
 	graphql "go-template/gqlmodels"
 	"go-template/internal/config"
 	"go-template/internal/jwt"
-	authMw "go-template/internal/middleware/auth"
 	"go-template/internal/mysql"
 	"go-template/internal/server"
-	throttle "go-template/pkg/utl/throttle"
 	"go-template/resolver"
+	"go-template/internal/middleware/auth"
 
 	graphql2 "github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
@@ -26,7 +26,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
 	_ "github.com/lib/pq" // here
-
 	"github.com/volatiletech/sqlboiler/v4/boil"
 )
 
@@ -45,46 +44,51 @@ func Start(cfg *config.Configuration) (*echo.Echo, error) {
 		cfg.JWT.SigningAlgorithm,
 		os.Getenv("JWT_SECRET"),
 		cfg.JWT.DurationMinutes,
-		cfg.JWT.MinSecretLength)
+		cfg.JWT.MinSecretLength,
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	e := server.New()
 
-	gqlMiddleware := authMw.GqlMiddleware()
-	// throttlerMiddleware puts the current user's IP address into context of gqlgen
-	throttlerMiddleware := throttle.GqlMiddleware()
+	gqlMiddleware := auth.GqlMiddleware()	
 
 	graphQLPathname := "/graphql"
 	playgroundHandler := playground.Handler("GraphQL playground", graphQLPathname)
 
-	observers := map[string]chan *graphql.User{}
+	observers := map[string]chan *graphql.Author{}
+	observer2 := map[string]chan *graphql.Article{}
+
 	graphqlHandler := handler.New(graphql.NewExecutableSchema(graphql.Config{
-		Resolvers: &resolver.Resolver{Observers: observers},
+		Resolvers: &resolver.Resolver{
+			Observers: observers,
+			Observers2: observer2,
+		},
 	}))
 
 	if os.Getenv("ENVIRONMENT_NAME") == "local" {
 		boil.DebugMode = true
 	}
 
-	// graphql apis
+	// Graphql apis
 	graphqlHandler.AroundOperations(func(ctx context.Context, next graphql2.OperationHandler) graphql2.ResponseHandler {
-		return authMw.GraphQLMiddleware(ctx, jwt, next)
+		return auth.GraphQlMiddleware(ctx, jwt, next)
 	})
+	
 	e.POST(graphQLPathname, func(c echo.Context) error {
 		req := c.Request()
 		res := c.Response()
 		graphqlHandler.ServeHTTP(res, req)
 		return nil
-	}, gqlMiddleware, throttlerMiddleware)
+	}, gqlMiddleware)
 
 	e.GET(graphQLPathname, func(c echo.Context) error {
 		req := c.Request()
 		res := c.Response()
 		graphqlHandler.ServeHTTP(res, req)
 		return nil
-	}, gqlMiddleware, throttlerMiddleware)
+	}, gqlMiddleware)
 
 	graphqlHandler.AddTransport(transport.Websocket{
 		KeepAlivePingInterval: 10 * time.Second,
@@ -94,7 +98,6 @@ func Start(cfg *config.Configuration) (*echo.Echo, error) {
 			},
 		},
 	})
-
 	graphqlHandler.AddTransport(transport.Options{})
 	graphqlHandler.AddTransport(transport.GET{})
 	graphqlHandler.AddTransport(transport.POST{})

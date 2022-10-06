@@ -1,0 +1,5 @@
+extend type Mutation {
+     createArticle (input: ArticleCreateInput!): Article!
+     updateArticle (input: ArticleUpdateInput!): Article!
+     deleteArticle (input: ArticleDeleteInput): ArticleDeletePayload!
+}
