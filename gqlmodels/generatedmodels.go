@@ -48,6 +48,7 @@ type Author struct {
 	CreateAt  *int       `json:"createAt"`
 	UpdatedAt *int       `json:"updatedAt"`
 	DeletedAt *int       `json:"deletedAt"`
+	Token     *string    `json:"token"`
 }
 
 type AuthorCreateInput struct {
@@ -85,4 +86,9 @@ type AuthorUpdateInput struct {
 type AuthorsPayload struct {
 	Authors []*Author `json:"authors"`
 	Total   int       `json:"total"`
+}
+
+type LoginResponse struct {
+	Token        string `json:"token"`
+	RefreshToken string `json:"refreshToken"`
 }

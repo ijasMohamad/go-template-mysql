@@ -23,6 +23,7 @@ func (a AnyTime) Match(v driver.Value) bool {
 	_, ok := v.(time.Time)
 	return ok
 }
+
 func TestCreateArticle(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -67,7 +68,8 @@ func TestCreateArticle(t *testing.T) {
 						WillReturnError(fmt.Errorf(""))
 				}
 
-				mock.ExpectExec(regexp.QuoteMeta("INSERT INTO `articles` (`title`,`author_id`,`created_at`,`updated_at`,`deleted_at`) VALUES (?,?,?,?,?)")). //nolint
+				mock.ExpectExec(regexp.QuoteMeta("INSERT INTO `articles` (`title`,`author_id`,"+
+							"`created_at`,`updated_at`,`deleted_at`) VALUES (?,?,?,?,?)")).
                               WithArgs(
 						testutls.MockArticle().Title,
 						testutls.MockArticle().AuthorID,
@@ -143,7 +145,8 @@ func TestUpdateArticle(t *testing.T) {
 				mock.ExpectQuery(regexp.QuoteMeta("select * from `articles`")).
 					WithArgs().
 					WillReturnRows(rows)
-				mock.ExpectExec(regexp.QuoteMeta("UPDATE `articles` SET `title`=?,`author_id`=?,`updated_at`=?,`deleted_at`=? WHERE `id`=?")). //nolint
+				mock.ExpectExec(regexp.QuoteMeta("UPDATE `articles` SET `title`=?,`author_id`=?,"+
+						"`updated_at`=?,`deleted_at`=? WHERE `id`=?")).
                          WithArgs().
 					WillReturnResult(sqlmock.NewResult(1, 1))
 

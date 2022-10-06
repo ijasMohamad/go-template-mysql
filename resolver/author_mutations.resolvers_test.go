@@ -68,12 +68,14 @@ func TestCreateAuthor(t *testing.T) {
                               WithArgs().
                               WillReturnError(fmt.Errorf(""))
                     }
-                    mock.ExpectExec(regexp.QuoteMeta("INSERT INTO `authors` (`first_name`,`last_name`,`username`,`password`,`active`,`created_at`,`updated_at`,`deleted_at`) VALUES (?,?,?,?,?,?,?,?)")). //nolint
+                    mock.ExpectExec(regexp.QuoteMeta("INSERT INTO `authors` (`first_name`,`last_name`,`username`,`password`,"+
+                              "`active`,`token`,`created_at`,`updated_at`,`deleted_at`) VALUES (?,?,?,?,?,?,?,?,?)")). 
                          WithArgs(
                               testutls.MockAuthor().FirstName,
                               testutls.MockAuthor().LastName,
                               testutls.MockAuthor().Username,
                               "",
+                              nil,
                               nil,
                               AnyTime{},
                               AnyTime{},
@@ -150,7 +152,8 @@ func TestUpdateAuthor(t *testing.T){
                     mock.ExpectQuery(regexp.QuoteMeta("select * from `authors`")).
                          WithArgs(0).
                          WillReturnRows(rows)
-                    mock.ExpectExec(regexp.QuoteMeta("UPDATE `authors` SET `first_name`=?,`last_name`=?,`username`=?,`password`=?,`active`=?,`updated_at`=?,`deleted_at`=? WHERE `id`=?")). //nolint
+                    mock.ExpectExec(regexp.QuoteMeta("UPDATE `authors` SET `first_name`=?,`last_name`=?,`username`=?,"+
+                              "`password`=?,`active`=?,`token`=?,`updated_at`=?,`deleted_at`=? WHERE `id`=?")). 
                                    WillReturnResult(sqlmock.NewResult(1, 1))
 
                     c := context.Background()

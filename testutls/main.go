@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"go-template/gqlmodels"
+	"go-template/internal/config"
 	"go-template/models"
 	"go-template/pkg/utl/convert"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/joho/godotenv"
 	"github.com/volatiletech/null/v8"
 	"github.com/volatiletech/sqlboiler/v4/boil"
@@ -28,6 +30,11 @@ var MockID int = 1
 var MockActive bool = false
 var MockTitle string = "Title"
 var MockCount = int(1)
+var MockUsername = "username"
+var MockToken = "token_string"
+var MockJWTSecret = "1234567890123456789012345678901234567890123456789012345678901234567890"
+var MockQuery = `{"query":"query allAuthors { allAuthors { authors { id } } }","variables":{}}"`
+var MockWhiteListedQuery = `{"query":"query Schema { __schema { queryType { kind } } }","variables":{}}"`
 
 func MockAuthor() *models.Author {
      return &models.Author {
@@ -90,7 +97,8 @@ type Parameters struct {
 func SetupEnv (envfile string) {
      err := godotenv.Load(envfile)
      if err != nil {
-          fmt.Print("Error loading .env file")
+          fmt.Println("EnvFile:", envfile)
+          fmt.Println("Error loading .env file", err)
      }
 }
 
@@ -117,4 +125,46 @@ type QueryData struct {
      Actions *[]driver.Value
      Query string
      DBResponse *sqlmock.Rows
+}
+
+func MockConfig() *config.Configuration {
+     return &config.Configuration{
+          Server: &config.Server{
+               Port: ":9000",
+               Debug: true,
+               ReadTimeout: 10,
+               WriteTimeout: 5,
+          },
+          DB: &config.Database{
+               LogQueries: true,
+               Timeout: 5,
+          },
+          JWT: &config.JWT{
+               MinSecretLength: 64,
+               DurationMinutes: 1440,
+               RefreshDuration: 3499200,
+               MaxRefresh: 1440,
+               SigningAlgorithm: "HS256",
+          },
+          App: &config.Application{
+               MinPasswordStr: 1,
+          },
+     }
+}
+
+func MockJWT() *jwt.Token {
+     return &jwt.Token{
+          Raw: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIi" +
+               "wibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+          Method: jwt.GetSigningMethod("HS256"),
+          Claims: jwt.MapClaims{
+               "u": MockUsername,
+               "exp": "1.641189209e+09",
+               "id": MockID,
+          },
+          Header: map[string]interface{}{
+               "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
+          },
+          Valid: true,
+     }
 }

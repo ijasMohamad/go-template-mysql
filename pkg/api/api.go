@@ -3,6 +3,7 @@ package api
 
 import (
 	// "context"
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -10,10 +11,13 @@ import (
 
 	graphql "go-template/gqlmodels"
 	"go-template/internal/config"
+	"go-template/internal/jwt"
 	"go-template/internal/mysql"
 	"go-template/internal/server"
 	"go-template/resolver"
+	"go-template/internal/middleware/auth"
 
+	graphql2 "github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/lru"
@@ -36,7 +40,19 @@ func Start(cfg *config.Configuration) (*echo.Echo, error) {
 
 	boil.SetDB(db)
 
+	jwt, err := jwt.New(
+		cfg.JWT.SigningAlgorithm,
+		os.Getenv("JWT_SECRET"),
+		cfg.JWT.DurationMinutes,
+		cfg.JWT.MinSecretLength,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	e := server.New()
+
+	gqlMiddleware := auth.GqlMiddleware()	
 
 	graphQLPathname := "/graphql"
 	playgroundHandler := playground.Handler("GraphQL playground", graphQLPathname)
@@ -54,20 +70,25 @@ func Start(cfg *config.Configuration) (*echo.Echo, error) {
 	if os.Getenv("ENVIRONMENT_NAME") == "local" {
 		boil.DebugMode = true
 	}
+
+	// Graphql apis
+	graphqlHandler.AroundOperations(func(ctx context.Context, next graphql2.OperationHandler) graphql2.ResponseHandler {
+		return auth.GraphQlMiddleware(ctx, jwt, next)
+	})
 	
 	e.POST(graphQLPathname, func(c echo.Context) error {
 		req := c.Request()
 		res := c.Response()
 		graphqlHandler.ServeHTTP(res, req)
 		return nil
-	})
+	}, gqlMiddleware)
 
 	e.GET(graphQLPathname, func(c echo.Context) error {
 		req := c.Request()
 		res := c.Response()
 		graphqlHandler.ServeHTTP(res, req)
 		return nil
-	})
+	}, gqlMiddleware)
 
 	graphqlHandler.AddTransport(transport.Websocket{
 		KeepAlivePingInterval: 10 * time.Second,

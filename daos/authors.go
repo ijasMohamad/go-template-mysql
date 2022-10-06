@@ -6,6 +6,7 @@ import (
 	"go-template/models"
 
 	"github.com/volatiletech/sqlboiler/v4/boil"
+	"github.com/volatiletech/sqlboiler/v4/queries/qm"
 )
 
 // Author queries...
@@ -13,6 +14,13 @@ import (
 func FindAuthorById (authorId int, ctx context.Context) (*models.Author, error) {
      var contextExecutor = getContextExecutor(nil)
      author, err := models.FindAuthor(ctx, contextExecutor, authorId)
+     return author, err
+}
+
+func FindAuthorByUsername(username string, ctx context.Context) (*models.Author, error) {
+     var contextExecutor = getContextExecutor(nil)
+     author, err := models.Authors(qm.Where(fmt.Sprintf("%s=?", models.AuthorColumns.Username), username)).
+                         One(ctx, contextExecutor) 
      return author, err
 }
 

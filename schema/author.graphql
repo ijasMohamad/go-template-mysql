@@ -9,6 +9,7 @@ type Author {
      createAt: Int
      updatedAt: Int
      deletedAt: Int
+     token: String
 }
 
 input AuthorCreateInput {
@@ -46,4 +47,9 @@ type AuthorsPayload {
 
 input AuthorDeleteInput {
      id: ID!
+}
+
+type LoginResponse {
+     token: String!
+     refreshToken: String!
 }

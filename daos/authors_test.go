@@ -2,6 +2,7 @@ package daos_test
 
 import (
 	"context"
+	"fmt"
 	"go-template/daos"
 	"go-template/models"
 	"go-template/testutls"
@@ -44,6 +45,42 @@ func TestFindAuthorById(t *testing.T){
           t.Run(tt.name, func(t *testing.T){
                _, err := daos.FindAuthorById(tt.req, context.Background())
                assert.Equal(t, err, tt.err)
+          })
+     }
+}
+
+func TestFindAuthorByUsername(t *testing.T){
+     cases := []struct {
+          name string
+          req string
+          err error
+     }{
+          {
+               name: "Passing a username",
+               req: testutls.MockAuthor().Username.String,
+               err: nil,
+          },
+     }
+     mock, db, _ := testutls.SetupEnvAndDB(t, testutls.Parameters{})
+     oldDB := boil.GetDB()
+     defer func(){
+          boil.SetDB(oldDB)
+          db.Close()
+     }()
+     boil.SetDB(db)
+     for _, tt := range cases {
+          rows := sqlmock.NewRows([]string{"id", "first_name", "last_name", "username"}).
+                    AddRow(testutls.MockAuthor().ID,
+                         testutls.MockAuthor().FirstName,
+                         testutls.MockAuthor().LastName,
+                         testutls.MockAuthor().Username)
+          mock.ExpectQuery(regexp.QuoteMeta("SELECT `authors`.* FROM `authors` WHERE (username=?) LIMIT 1;")).
+               WithArgs(testutls.MockAuthor().Username).
+               WillReturnRows(rows)
+          t.Run(tt.name, func(t *testing.T){
+               _, err := daos.FindAuthorByUsername(tt.req, context.Background())
+               fmt.Println("ERROR: ", err)
+               assert.Equal(t, tt.err, err)
           })
      }
 }

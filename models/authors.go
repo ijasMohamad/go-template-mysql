@@ -30,6 +30,7 @@ type Author struct {
 	Username  null.String `boil:"username" json:"username,omitempty" toml:"username" yaml:"username,omitempty"`
 	Password  null.String `boil:"password" json:"password,omitempty" toml:"password" yaml:"password,omitempty"`
 	Active    null.Bool   `boil:"active" json:"active,omitempty" toml:"active" yaml:"active,omitempty"`
+	Token     null.String `boil:"token" json:"token,omitempty" toml:"token" yaml:"token,omitempty"`
 	CreatedAt null.Time   `boil:"created_at" json:"created_at,omitempty" toml:"created_at" yaml:"created_at,omitempty"`
 	UpdatedAt null.Time   `boil:"updated_at" json:"updated_at,omitempty" toml:"updated_at" yaml:"updated_at,omitempty"`
 	DeletedAt null.Time   `boil:"deleted_at" json:"deleted_at,omitempty" toml:"deleted_at" yaml:"deleted_at,omitempty"`
@@ -45,6 +46,7 @@ var AuthorColumns = struct {
 	Username  string
 	Password  string
 	Active    string
+	Token     string
 	CreatedAt string
 	UpdatedAt string
 	DeletedAt string
@@ -55,6 +57,7 @@ var AuthorColumns = struct {
 	Username:  "username",
 	Password:  "password",
 	Active:    "active",
+	Token:     "token",
 	CreatedAt: "created_at",
 	UpdatedAt: "updated_at",
 	DeletedAt: "deleted_at",
@@ -67,6 +70,7 @@ var AuthorTableColumns = struct {
 	Username  string
 	Password  string
 	Active    string
+	Token     string
 	CreatedAt string
 	UpdatedAt string
 	DeletedAt string
@@ -77,6 +81,7 @@ var AuthorTableColumns = struct {
 	Username:  "authors.username",
 	Password:  "authors.password",
 	Active:    "authors.active",
+	Token:     "authors.token",
 	CreatedAt: "authors.created_at",
 	UpdatedAt: "authors.updated_at",
 	DeletedAt: "authors.deleted_at",
@@ -115,6 +120,7 @@ var AuthorWhere = struct {
 	Username  whereHelpernull_String
 	Password  whereHelpernull_String
 	Active    whereHelpernull_Bool
+	Token     whereHelpernull_String
 	CreatedAt whereHelpernull_Time
 	UpdatedAt whereHelpernull_Time
 	DeletedAt whereHelpernull_Time
@@ -125,6 +131,7 @@ var AuthorWhere = struct {
 	Username:  whereHelpernull_String{field: "`authors`.`username`"},
 	Password:  whereHelpernull_String{field: "`authors`.`password`"},
 	Active:    whereHelpernull_Bool{field: "`authors`.`active`"},
+	Token:     whereHelpernull_String{field: "`authors`.`token`"},
 	CreatedAt: whereHelpernull_Time{field: "`authors`.`created_at`"},
 	UpdatedAt: whereHelpernull_Time{field: "`authors`.`updated_at`"},
 	DeletedAt: whereHelpernull_Time{field: "`authors`.`deleted_at`"},
@@ -158,8 +165,8 @@ func (r *authorR) GetArticles() ArticleSlice {
 type authorL struct{}
 
 var (
-	authorAllColumns            = []string{"id", "first_name", "last_name", "username", "password", "active", "created_at", "updated_at", "deleted_at"}
-	authorColumnsWithoutDefault = []string{"first_name", "last_name", "username", "password", "active", "updated_at", "deleted_at"}
+	authorAllColumns            = []string{"id", "first_name", "last_name", "username", "password", "active", "token", "created_at", "updated_at", "deleted_at"}
+	authorColumnsWithoutDefault = []string{"first_name", "last_name", "username", "password", "active", "token", "updated_at", "deleted_at"}
 	authorColumnsWithDefault    = []string{"id", "created_at"}
 	authorPrimaryKeyColumns     = []string{"id"}
 	authorGeneratedColumns      = []string{}

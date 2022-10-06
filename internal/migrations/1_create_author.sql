@@ -7,6 +7,7 @@ CREATE TABLE authors (
 			username VARCHAR(100) UNIQUE,
 			password TEXT,
 			active BOOLEAN,
+			token TEXT,
 			created_at TIMESTAMP DEFAULT NOW(),
 			updated_at TIMESTAMP,
 			deleted_at TIMESTAMP
