@@ -42,6 +42,7 @@ type ResolverRoot interface {
 }
 
 type DirectiveRoot struct {
+	HasRole func(ctx context.Context, obj interface{}, next graphql.Resolver, role Role) (res interface{}, err error)
 }
 
 type ComplexityRoot struct {
@@ -75,6 +76,7 @@ type ComplexityRoot struct {
 		ID        func(childComplexity int) int
 		LastName  func(childComplexity int) int
 		Password  func(childComplexity int) int
+		Role      func(childComplexity int) int
 		Token     func(childComplexity int) int
 		UpdatedAt func(childComplexity int) int
 		Username  func(childComplexity int) int
@@ -274,6 +276,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Author.Password(childComplexity), true
+
+	case "Author.role":
+		if e.complexity.Author.Role == nil {
+			break
+		}
+
+		return e.complexity.Author.Role(childComplexity), true
 
 	case "Author.token":
 		if e.complexity.Author.Token == nil {
@@ -618,11 +627,12 @@ input ArticleDeleteInput {
      username: String
      password: String
      active: Boolean
+     token: String
+     role: String
      articles: [Article]
      createAt: Int
      updatedAt: Int
      deletedAt: Int
-     token: String
 }
 
 input AuthorCreateInput {
@@ -631,6 +641,7 @@ input AuthorCreateInput {
      username: String!
      password: String!
      active: Boolean
+     role: String!
 }
 
 input AuthorUpdateInput {
@@ -665,15 +676,24 @@ input AuthorDeleteInput {
 type LoginResponse {
      token: String!
      refreshToken: String!
+}
+
+directive @hasRole(role: Role!) on FIELD_DEFINITION
+
+enum Role {
+     ADMIN
+     USER
 }`, BuiltIn: false},
 	{Name: "../schema/author_mutations.graphql", Input: `extend type Mutation {
      createAuthor (input: AuthorCreateInput!): Author!
      updateAuthor (input: AuthorUpdateInput): Author!
-     deleteAuthor (input: AuthorDeleteInput): AuthorDeletePayload!
 }`, BuiltIn: false},
 	{Name: "../schema/author_queries.graphql", Input: `extend type Query {
      author(id: Int!): Author!
      allAuthors: AuthorsPayload!
+}`, BuiltIn: false},
+	{Name: "../schema/directives_mutations.graphql", Input: `extend type Mutation {
+     deleteAuthor (input: AuthorDeleteInput): AuthorDeletePayload! @hasRole(role: ADMIN)
 }`, BuiltIn: false},
 	{Name: "../schema/subscriptions.graphql", Input: `extend type Subscription {
      authorNotification: Author!
@@ -685,6 +705,21 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
+
+func (ec *executionContext) dir_hasRole_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 Role
+	if tmp, ok := rawArgs["role"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("role"))
+		arg0, err = ec.unmarshalNRole2goᚑtemplateᚋgqlmodelsᚐRole(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["role"] = arg0
+	return args, nil
+}
 
 func (ec *executionContext) field_Mutation_createArticle_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
@@ -1540,6 +1575,88 @@ func (ec *executionContext) fieldContext_Author_active(ctx context.Context, fiel
 	return fc, nil
 }
 
+func (ec *executionContext) _Author_token(ctx context.Context, field graphql.CollectedField, obj *Author) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Author_token(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Token, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Author_token(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Author",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Author_role(ctx context.Context, field graphql.CollectedField, obj *Author) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Author_role(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Role, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Author_role(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Author",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Author_articles(ctx context.Context, field graphql.CollectedField, obj *Author) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Author_articles(ctx, field)
 	if err != nil {
@@ -1716,47 +1833,6 @@ func (ec *executionContext) fieldContext_Author_deletedAt(ctx context.Context, f
 	return fc, nil
 }
 
-func (ec *executionContext) _Author_token(ctx context.Context, field graphql.CollectedField, obj *Author) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Author_token(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Token, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Author_token(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Author",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _AuthorDeletePayload_id(ctx context.Context, field graphql.CollectedField, obj *AuthorDeletePayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_AuthorDeletePayload_id(ctx, field)
 	if err != nil {
@@ -1852,6 +1928,10 @@ func (ec *executionContext) fieldContext_AuthorPayload_author(ctx context.Contex
 				return ec.fieldContext_Author_password(ctx, field)
 			case "active":
 				return ec.fieldContext_Author_active(ctx, field)
+			case "token":
+				return ec.fieldContext_Author_token(ctx, field)
+			case "role":
+				return ec.fieldContext_Author_role(ctx, field)
 			case "articles":
 				return ec.fieldContext_Author_articles(ctx, field)
 			case "createAt":
@@ -1860,8 +1940,6 @@ func (ec *executionContext) fieldContext_AuthorPayload_author(ctx context.Contex
 				return ec.fieldContext_Author_updatedAt(ctx, field)
 			case "deletedAt":
 				return ec.fieldContext_Author_deletedAt(ctx, field)
-			case "token":
-				return ec.fieldContext_Author_token(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Author", field.Name)
 		},
@@ -1920,6 +1998,10 @@ func (ec *executionContext) fieldContext_AuthorsPayload_authors(ctx context.Cont
 				return ec.fieldContext_Author_password(ctx, field)
 			case "active":
 				return ec.fieldContext_Author_active(ctx, field)
+			case "token":
+				return ec.fieldContext_Author_token(ctx, field)
+			case "role":
+				return ec.fieldContext_Author_role(ctx, field)
 			case "articles":
 				return ec.fieldContext_Author_articles(ctx, field)
 			case "createAt":
@@ -1928,8 +2010,6 @@ func (ec *executionContext) fieldContext_AuthorsPayload_authors(ctx context.Cont
 				return ec.fieldContext_Author_updatedAt(ctx, field)
 			case "deletedAt":
 				return ec.fieldContext_Author_deletedAt(ctx, field)
-			case "token":
-				return ec.fieldContext_Author_token(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Author", field.Name)
 		},
@@ -2374,6 +2454,10 @@ func (ec *executionContext) fieldContext_Mutation_createAuthor(ctx context.Conte
 				return ec.fieldContext_Author_password(ctx, field)
 			case "active":
 				return ec.fieldContext_Author_active(ctx, field)
+			case "token":
+				return ec.fieldContext_Author_token(ctx, field)
+			case "role":
+				return ec.fieldContext_Author_role(ctx, field)
 			case "articles":
 				return ec.fieldContext_Author_articles(ctx, field)
 			case "createAt":
@@ -2382,8 +2466,6 @@ func (ec *executionContext) fieldContext_Mutation_createAuthor(ctx context.Conte
 				return ec.fieldContext_Author_updatedAt(ctx, field)
 			case "deletedAt":
 				return ec.fieldContext_Author_deletedAt(ctx, field)
-			case "token":
-				return ec.fieldContext_Author_token(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Author", field.Name)
 		},
@@ -2453,6 +2535,10 @@ func (ec *executionContext) fieldContext_Mutation_updateAuthor(ctx context.Conte
 				return ec.fieldContext_Author_password(ctx, field)
 			case "active":
 				return ec.fieldContext_Author_active(ctx, field)
+			case "token":
+				return ec.fieldContext_Author_token(ctx, field)
+			case "role":
+				return ec.fieldContext_Author_role(ctx, field)
 			case "articles":
 				return ec.fieldContext_Author_articles(ctx, field)
 			case "createAt":
@@ -2461,8 +2547,6 @@ func (ec *executionContext) fieldContext_Mutation_updateAuthor(ctx context.Conte
 				return ec.fieldContext_Author_updatedAt(ctx, field)
 			case "deletedAt":
 				return ec.fieldContext_Author_deletedAt(ctx, field)
-			case "token":
-				return ec.fieldContext_Author_token(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Author", field.Name)
 		},
@@ -2494,8 +2578,32 @@ func (ec *executionContext) _Mutation_deleteAuthor(ctx context.Context, field gr
 		}
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().DeleteAuthor(rctx, fc.Args["input"].(*AuthorDeleteInput))
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().DeleteAuthor(rctx, fc.Args["input"].(*AuthorDeleteInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			role, err := ec.unmarshalNRole2goᚑtemplateᚋgqlmodelsᚐRole(ctx, "ADMIN")
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.HasRole == nil {
+				return nil, errors.New("directive hasRole is not implemented")
+			}
+			return ec.directives.HasRole(ctx, nil, directive0, role)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*AuthorDeletePayload); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *go-template/gqlmodels.AuthorDeletePayload`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2708,6 +2816,10 @@ func (ec *executionContext) fieldContext_Query_author(ctx context.Context, field
 				return ec.fieldContext_Author_password(ctx, field)
 			case "active":
 				return ec.fieldContext_Author_active(ctx, field)
+			case "token":
+				return ec.fieldContext_Author_token(ctx, field)
+			case "role":
+				return ec.fieldContext_Author_role(ctx, field)
 			case "articles":
 				return ec.fieldContext_Author_articles(ctx, field)
 			case "createAt":
@@ -2716,8 +2828,6 @@ func (ec *executionContext) fieldContext_Query_author(ctx context.Context, field
 				return ec.fieldContext_Author_updatedAt(ctx, field)
 			case "deletedAt":
 				return ec.fieldContext_Author_deletedAt(ctx, field)
-			case "token":
-				return ec.fieldContext_Author_token(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Author", field.Name)
 		},
@@ -2980,6 +3090,10 @@ func (ec *executionContext) fieldContext_Subscription_authorNotification(ctx con
 				return ec.fieldContext_Author_password(ctx, field)
 			case "active":
 				return ec.fieldContext_Author_active(ctx, field)
+			case "token":
+				return ec.fieldContext_Author_token(ctx, field)
+			case "role":
+				return ec.fieldContext_Author_role(ctx, field)
 			case "articles":
 				return ec.fieldContext_Author_articles(ctx, field)
 			case "createAt":
@@ -2988,8 +3102,6 @@ func (ec *executionContext) fieldContext_Subscription_authorNotification(ctx con
 				return ec.fieldContext_Author_updatedAt(ctx, field)
 			case "deletedAt":
 				return ec.fieldContext_Author_deletedAt(ctx, field)
-			case "token":
-				return ec.fieldContext_Author_token(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Author", field.Name)
 		},
@@ -4947,7 +5059,7 @@ func (ec *executionContext) unmarshalInputAuthorCreateInput(ctx context.Context,
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"firstName", "lastName", "username", "password", "active"}
+	fieldsInOrder := [...]string{"firstName", "lastName", "username", "password", "active", "role"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -4991,6 +5103,14 @@ func (ec *executionContext) unmarshalInputAuthorCreateInput(ctx context.Context,
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("active"))
 			it.Active, err = ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "role":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("role"))
+			it.Role, err = ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -5300,6 +5420,14 @@ func (ec *executionContext) _Author(ctx context.Context, sel ast.SelectionSet, o
 
 			out.Values[i] = ec._Author_active(ctx, field, obj)
 
+		case "token":
+
+			out.Values[i] = ec._Author_token(ctx, field, obj)
+
+		case "role":
+
+			out.Values[i] = ec._Author_role(ctx, field, obj)
+
 		case "articles":
 
 			out.Values[i] = ec._Author_articles(ctx, field, obj)
@@ -5315,10 +5443,6 @@ func (ec *executionContext) _Author(ctx context.Context, sel ast.SelectionSet, o
 		case "deletedAt":
 
 			out.Values[i] = ec._Author_deletedAt(ctx, field, obj)
-
-		case "token":
-
-			out.Values[i] = ec._Author_token(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -6268,6 +6392,16 @@ func (ec *executionContext) marshalNLoginResponse2ᚖgoᚑtemplateᚋgqlmodels�
 		return graphql.Null
 	}
 	return ec._LoginResponse(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNRole2goᚑtemplateᚋgqlmodelsᚐRole(ctx context.Context, v interface{}) (Role, error) {
+	var res Role
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNRole2goᚑtemplateᚋgqlmodelsᚐRole(ctx context.Context, sel ast.SelectionSet, v Role) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v interface{}) (string, error) {

@@ -2,20 +2,21 @@
 package api
 
 import (
-	// "context"
 	"context"
 	"fmt"
 	"net/http"
 	"os"
 	"time"
 
+	"go-template/gqlmodels"
 	graphql "go-template/gqlmodels"
 	"go-template/internal/config"
 	"go-template/internal/jwt"
+	"go-template/internal/middleware/auth"
 	"go-template/internal/mysql"
 	"go-template/internal/server"
+	"go-template/models"
 	"go-template/resolver"
-	"go-template/internal/middleware/auth"
 
 	graphql2 "github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
@@ -52,7 +53,7 @@ func Start(cfg *config.Configuration) (*echo.Echo, error) {
 
 	e := server.New()
 
-	gqlMiddleware := auth.GqlMiddleware()	
+	gqlMiddleware := auth.GqlMiddleware()
 
 	graphQLPathname := "/graphql"
 	playgroundHandler := playground.Handler("GraphQL playground", graphQLPathname)
@@ -60,12 +61,22 @@ func Start(cfg *config.Configuration) (*echo.Echo, error) {
 	observers := map[string]chan *graphql.Author{}
 	observer2 := map[string]chan *graphql.Article{}
 
-	graphqlHandler := handler.New(graphql.NewExecutableSchema(graphql.Config{
+	c := graphql.Config{
 		Resolvers: &resolver.Resolver{
-			Observers: observers,
+			Observers:  observers,
 			Observers2: observer2,
 		},
-	}))
+	}
+	c.Directives.HasRole = func(ctx context.Context, obj interface{}, next graphql2.Resolver, role gqlmodels.Role) (interface{}, error) { //nolint
+		author := ctx.Value(auth.AuthorCtxKey).(*models.Author)
+		// Checking the logged user is admin or not
+		if role != graphql.Role(author.Role.String) {
+			return nil, fmt.Errorf("Access denied")
+		}
+		return next(ctx)
+	}
+
+	graphqlHandler := handler.New(graphql.NewExecutableSchema(c))
 
 	if os.Getenv("ENVIRONMENT_NAME") == "local" {
 		boil.DebugMode = true
@@ -75,7 +86,7 @@ func Start(cfg *config.Configuration) (*echo.Echo, error) {
 	graphqlHandler.AroundOperations(func(ctx context.Context, next graphql2.OperationHandler) graphql2.ResponseHandler {
 		return auth.GraphQlMiddleware(ctx, jwt, next)
 	})
-	
+
 	e.POST(graphQLPathname, func(c echo.Context) error {
 		req := c.Request()
 		res := c.Response()

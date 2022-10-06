@@ -8,6 +8,7 @@ CREATE TABLE authors (
 			password TEXT,
 			active BOOLEAN,
 			token TEXT,
+			role TEXT,
 			created_at TIMESTAMP DEFAULT NOW(),
 			updated_at TIMESTAMP,
 			deleted_at TIMESTAMP

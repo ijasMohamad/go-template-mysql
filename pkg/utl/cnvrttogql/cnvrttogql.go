@@ -36,6 +36,7 @@ func AuthorToGraphQLAuthor(a *models.Author) *gqlmodels.Author {
 		Username:  convert.NullDotStringToPointerString(a.Username),
 		Active:    convert.NullDotBoolToPointerBool(a.Active),
 		Articles:  ArticlesToGraphQLArticles(articles),
+		Role: convert.NullDotStringToPointerString(a.Role),
 	}
 }
 

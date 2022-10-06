@@ -5,11 +5,12 @@ type Author {
      username: String
      password: String
      active: Boolean
+     token: String
+     role: String
      articles: [Article]
      createAt: Int
      updatedAt: Int
      deletedAt: Int
-     token: String
 }
 
 input AuthorCreateInput {
@@ -18,6 +19,7 @@ input AuthorCreateInput {
      username: String!
      password: String!
      active: Boolean
+     role: String!
 }
 
 input AuthorUpdateInput {
@@ -52,4 +54,11 @@ input AuthorDeleteInput {
 type LoginResponse {
      token: String!
      refreshToken: String!
+}
+
+directive @hasRole(role: Role!) on FIELD_DEFINITION
+
+enum Role {
+     ADMIN
+     USER
 }
