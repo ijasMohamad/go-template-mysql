@@ -3,9 +3,10 @@ package mysql
 import (
 	"database/sql"
 	"fmt"
-	"go-template/pkg/utl/zaplog"
-	// "go-template/testutls"
 	"os"
+	
+	"go-template/pkg/utl/zaplog"
+	"go-template/testutls"
 
 	// DB adapter
 	_ "github.com/go-sql-driver/mysql"
@@ -16,10 +17,10 @@ import (
 // Connect ...
 func Connect() (*sql.DB, error) {
 	dsn := GetDSN()
-	zaplog.Logger.Info("Connecting to DB\n", dsn)
-	// if testutls.IsInTests() {
-	// 	return sql.Open("mysql", dsn)
-	// }
+	zaplog.Logger.Info("Connecting to DB\n")
+	if testutls.IsInTests() {
+		return sql.Open("mysql", dsn)
+	}
 	return otelsql.Open("mysql", dsn, otelsql.WithAttributes(semconv.DBSystemMySQL))
 }
 

@@ -1,7 +1,34 @@
 type Article {
      id: ID!
      title: String
-     createAt: Int
+     createdAt: Int
      updatedAt: Int
      deletedAt: Int
+}
+
+input ArticleCreateInput {
+     title: String!
+     authorId: ID!
+}
+
+input ArticleUpdateInput {
+     id: ID!
+     title: String
+}
+
+type ArticlePayload {
+     article: Article!
+}
+
+type ArticleDeletePayload {
+     id: ID!
+}
+
+type ArticlesPayload {
+     articles: [Article!]!
+     total: Int! 
+}
+
+input ArticleDeleteInput {
+     id: ID!
 }
