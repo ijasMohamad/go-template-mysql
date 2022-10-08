@@ -464,9 +464,25 @@ func (authorL) LoadArticles(ctx context.Context, e boil.ContextExecutor, singula
 	var object *Author
 
 	if singular {
-		object = maybeAuthor.(*Author)
+		var ok bool
+		object, ok = maybeAuthor.(*Author)
+		if !ok {
+			object = new(Author)
+			ok = queries.SetFromEmbeddedStruct(&object, &maybeAuthor)
+			if !ok {
+				return errors.New(fmt.Sprintf("failed to set %T from embedded struct %T", object, maybeAuthor))
+			}
+		}
 	} else {
-		slice = *maybeAuthor.(*[]*Author)
+		s, ok := maybeAuthor.(*[]*Author)
+		if ok {
+			slice = *s
+		} else {
+			ok = queries.SetFromEmbeddedStruct(&slice, maybeAuthor)
+			if !ok {
+				return errors.New(fmt.Sprintf("failed to set %T from embedded struct %T", slice, maybeAuthor))
+			}
+		}
 	}
 
 	args := make([]interface{}, 0, 1)
