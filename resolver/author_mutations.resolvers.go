@@ -32,6 +32,7 @@ func (r *mutationResolver) CreateAuthor(ctx context.Context, input gqlmodels.Aut
 	}
 	cfg, err := config.Load()
 	if err != nil {
+
 		fmt.Println("Error in loading config")
 		return nil, fmt.Errorf("Error in loading config")
 	}
@@ -59,6 +60,7 @@ func (r *mutationResolver) CreateAuthor(ctx context.Context, input gqlmodels.Aut
 
 // UpdateAuthor is the resolver for the updateAuthor field.
 func (r *mutationResolver) UpdateAuthor(ctx context.Context, input *gqlmodels.AuthorUpdateInput) (*gqlmodels.Author, error) {
+
 	fmt.Println("INPUT ID: ", input.ID)
 	authorID, err := strconv.Atoi(input.ID)
 	if err != nil {
@@ -102,7 +104,6 @@ func (r *mutationResolver) UpdateAuthor(ctx context.Context, input *gqlmodels.Au
 		return nil, err
 	}
 	graphqlAuthor := cnvrttogql.AuthorToGraphQLAuthor(&a)
-
 	return graphqlAuthor, nil
 }
 

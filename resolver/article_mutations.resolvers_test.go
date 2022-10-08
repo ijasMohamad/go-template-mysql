@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/volatiletech/sqlboiler/v4/boil"
 )
+
 type AnyTime struct{}
 
 func (a AnyTime) Match(v driver.Value) bool {

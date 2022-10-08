@@ -83,6 +83,7 @@ func TestCreateAuthor(t *testing.T) {
 
                     c := context.Background()
                     response, err := resolver1.Mutation().CreateAuthor(c, tt.req)
+
                     fmt.Println("RESPONSE: ", response)
                     fmt.Println("ERROR: ", err)
                     if tt.wantResp != nil {
@@ -150,12 +151,14 @@ func TestUpdateAuthor(t *testing.T){
                     mock.ExpectQuery(regexp.QuoteMeta("select * from `authors`")).
                          WithArgs(0).
                          WillReturnRows(rows)
+
                     mock.ExpectExec(regexp.QuoteMeta("UPDATE `authors` SET `first_name`=?,`last_name`=?,`username`=?,`password`=?,`active`=?,`updated_at`=?,`deleted_at`=? WHERE `id`=?")). //nolint
                                    WillReturnResult(sqlmock.NewResult(1, 1))
 
                     c := context.Background()
                     ctx := context.WithValue(c, testutls.AuthorKey, testutls.MockAuthor())
                     response, err := resolver1.Mutation().UpdateAuthor(ctx, &tt.req)
+
                     fmt.Println("RESPONSE: ", response)
                     fmt.Println("ERROR: ", err)
                     if tt.wantResp != nil && response != nil {
@@ -227,6 +230,7 @@ func TestDeleteAuthor(t *testing.T){
                     c := context.Background()
                     ctx := context.WithValue(c, testutls.AuthorKey, testutls.MockAuthor())
                     response, err := resolver1.Mutation().DeleteAuthor(ctx, tt.req)
+
                     fmt.Println("RESPONSE: ", response)
 	               fmt.Println("ERROR: ", err)
                     if tt.wantResp != nil {

@@ -119,7 +119,6 @@ func TestAllAuthors(t *testing.T) {
                                    []string{"id", "first_name", "last_name", "username"},
                               ).
                               AddRow(testutls.MockID, "First", "Last", "username")
-
                               Query := regexp.QuoteMeta("SELECT `authors`.* FROM `authors`;")
                               fmt.Println("Query all: ", Query)
 

@@ -32,6 +32,7 @@ func FindAllAuthorsWithCount (ctx context.Context) (models.AuthorSlice, int, err
 // Author mutations...
 
 func CreateAuthor (author models.Author, ctx context.Context) (models.Author, error) {
+
      contextExecutor := getContextExecutor(nil)
      err := author.Insert(ctx, contextExecutor, boil.Infer())
      fmt.Println("Error in doas package: ", err)
@@ -39,6 +40,7 @@ func CreateAuthor (author models.Author, ctx context.Context) (models.Author, er
 }
 
 func UpdateAuthor (author models.Author, ctx context.Context) (models.Author, error) {
+
      contextExecutor := getContextExecutor(nil)
      _, err := author.Update(ctx, contextExecutor, boil.Infer())
      return author, err
