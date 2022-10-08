@@ -4,12 +4,13 @@ import (
 	"context"
 	"database/sql/driver"
 	"fmt"
+	"regexp"
+	"testing"
+
 	"go-template/gqlmodels"
 	"go-template/pkg/utl/convert"
 	"go-template/resolver"
 	"go-template/testutls"
-	"regexp"
-	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
@@ -34,8 +35,6 @@ func TestCreateAuthor(t *testing.T) {
                     FirstName: testutls.MockAuthor().FirstName.String,
                     LastName: testutls.MockAuthor().LastName.String,
                     Username: testutls.MockAuthor().Username.String,
-                    // Password: testutls.MockAuthor().Password.String,
-                    // Active: &testutls.MockAuthor().Active.Bool,
                },
                wantResp: &gqlmodels.Author{
                     ID: fmt.Sprint(testutls.MockAuthor().ID),
@@ -59,8 +58,8 @@ func TestCreateAuthor(t *testing.T) {
 				)
 				oldDB := boil.GetDB()
 				defer func() {
-					db.Close()
 					boil.SetDB(oldDB)
+					db.Close()
 				}()
 				boil.SetDB(db)
                     if tt.name == "Fail on creating author" {
@@ -69,17 +68,24 @@ func TestCreateAuthor(t *testing.T) {
                               WithArgs().
                               WillReturnError(fmt.Errorf(""))
                     }
-                    mock.ExpectExec(regexp.QuoteMeta("INSERT INTO `authors` (`first_name`, `last_name`, `username`)"+
-                              "VALUES (?,?,?)")).
+                    mock.ExpectExec(regexp.QuoteMeta("INSERT INTO `authors` (`first_name`,`last_name`,`username`,`password`,`active`,`created_at`,`updated_at`,`deleted_at`) VALUES (?,?,?,?,?,?,?,?)")). //nolint
                          WithArgs(
                               testutls.MockAuthor().FirstName,
                               testutls.MockAuthor().LastName,
                               testutls.MockAuthor().Username,
+                              "",
+                              nil,
+                              AnyTime{},
+                              AnyTime{},
+                              nil,
                          ).
                          WillReturnResult(sqlmock.NewResult(1, 1))
 
                     c := context.Background()
                     response, err := resolver1.Mutation().CreateAuthor(c, tt.req)
+
+                    fmt.Println("RESPONSE: ", response)
+                    fmt.Println("ERROR: ", err)
                     if tt.wantResp != nil {
                          assert.EqualValues(t, tt.wantResp, response)
                     }
@@ -104,6 +110,7 @@ func TestUpdateAuthor(t *testing.T){
           {
                name: "Success",
                req: gqlmodels.AuthorUpdateInput{
+                    ID: "0",
                     FirstName: &testutls.MockAuthor().FirstName.String,
                     LastName: &testutls.MockAuthor().LastName.String,
                     Username: &testutls.MockAuthor().Username.String,
@@ -144,13 +151,16 @@ func TestUpdateAuthor(t *testing.T){
                     mock.ExpectQuery(regexp.QuoteMeta("select * from `authors`")).
                          WithArgs(0).
                          WillReturnRows(rows)
-                    mock.ExpectExec(regexp.QuoteMeta("UPDATE `authors` SET `first_name`=?, `last_name`=?, `username`=?"+
-                                   "`password`=?, `active`=?, `updated_at`=?, `deleted_at`=? WHERE `id`=?")).
+
+                    mock.ExpectExec(regexp.QuoteMeta("UPDATE `authors` SET `first_name`=?,`last_name`=?,`username`=?,`password`=?,`active`=?,`updated_at`=?,`deleted_at`=? WHERE `id`=?")). //nolint
                                    WillReturnResult(sqlmock.NewResult(1, 1))
 
                     c := context.Background()
                     ctx := context.WithValue(c, testutls.AuthorKey, testutls.MockAuthor())
                     response, err := resolver1.Mutation().UpdateAuthor(ctx, &tt.req)
+
+                    fmt.Println("RESPONSE: ", response)
+                    fmt.Println("ERROR: ", err)
                     if tt.wantResp != nil && response != nil {
                          assert.Equal(t, tt.wantResp, response)
                     }
@@ -214,12 +224,15 @@ func TestDeleteAuthor(t *testing.T){
                               1,
                          ),
                     )
-                    mock.ExpectExec(regexp.QuoteMeta("DELETE * FROM `authors` WHERE `id`=?")).
+                    mock.ExpectExec(regexp.QuoteMeta("DELETE FROM `authors` WHERE `id`=?")).
                          WillReturnResult(result)
                     
                     c := context.Background()
                     ctx := context.WithValue(c, testutls.AuthorKey, testutls.MockAuthor())
                     response, err := resolver1.Mutation().DeleteAuthor(ctx, tt.req)
+
+                    fmt.Println("RESPONSE: ", response)
+	               fmt.Println("ERROR: ", err)
                     if tt.wantResp != nil {
                          assert.Equal(t, tt.wantResp, response)
                     }

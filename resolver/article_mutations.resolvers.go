@@ -5,6 +5,7 @@ package resolver
 
 import (
 	"context"
+	"fmt"
 	"go-template/daos"
 	"go-template/gqlmodels"
 	"go-template/models"
@@ -23,24 +24,22 @@ func (r *mutationResolver) CreateArticle(ctx context.Context, input gqlmodels.Ar
 	}
 	// daos....
 	newArticle, err := daos.CreateArticle(article, ctx)
+
 	if err != nil {
+		fmt.Println("Error: ", err)
 		return nil, err
 	}
 	graphArticle := cnvrttogql.ArticleToGraphQLArticle(&newArticle)
-
-	// r.Lock()
-	// for _, observer := range r.Observers2 {
-	// 	observer <- graphArticle
-	// }
-	// r.Unlock()
 
 	return graphArticle, nil
 }
 
 // UpdateArticle is the resolver for the updateArticle field.
 func (r *mutationResolver) UpdateArticle(ctx context.Context, input gqlmodels.ArticleUpdateInput) (*gqlmodels.Article, error) {
+	fmt.Println("INPUT ID:", input.ID)
 	articleID, err := strconv.Atoi(input.ID)
 	if err != nil {
+		fmt.Println("Error in resolver:", err)
 		return nil, err
 	}
 
@@ -54,19 +53,17 @@ func (r *mutationResolver) UpdateArticle(ctx context.Context, input gqlmodels.Ar
 	if input.Title != nil {
 		a.Title = null.StringFrom(*input.Title)
 	}
+	fmt.Println("A: ", &a.ID)
+	fmt.Println("ARTICLE: ", article)
 
 	// doas...
 	_, err = daos.UpdateArticle(a, ctx)
 	if err != nil {
+		fmt.Println("Error while updating", err)
 		return nil, err
 	}
 	graphArticle := cnvrttogql.ArticleToGraphQLArticle(&a)
-
-	// r.Lock()
-	// for _, observer := range r.Observers2 {
-	// 	observer <- graphArticle
-	// }
-	// r.Unlock()
+	fmt.Println("graphArticle: ", graphArticle)
 
 	return graphArticle, nil
 }

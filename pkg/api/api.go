@@ -10,15 +10,10 @@ import (
 
 	graphql "go-template/gqlmodels"
 	"go-template/internal/config"
-	// "go-template/pkg/utl/zaplog"
-	// "go-template/internal/jwt"
-	// authMw "go-template/internal/middleware/auth"
 	"go-template/internal/mysql"
 	"go-template/internal/server"
-	// throttle "go-template/pkg/utl/throttle"
 	"go-template/resolver"
 
-	// graphql2 "github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/lru"
@@ -41,20 +36,7 @@ func Start(cfg *config.Configuration) (*echo.Echo, error) {
 
 	boil.SetDB(db)
 
-	// jwt, err := jwt.New(
-	// 	cfg.JWT.SigningAlgorithm,
-	// 	os.Getenv("JWT_SECRET"),
-	// 	cfg.JWT.DurationMinutes,
-	// 	cfg.JWT.MinSecretLength)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
 	e := server.New()
-
-	// gqlMiddleware := authMw.GqlMiddleware()
-	// throttlerMiddleware puts the current user's IP address into context of gqlgen
-	// throttlerMiddleware := throttle.GqlMiddleware()
 
 	graphQLPathname := "/graphql"
 	playgroundHandler := playground.Handler("GraphQL playground", graphQLPathname)
@@ -73,10 +55,6 @@ func Start(cfg *config.Configuration) (*echo.Echo, error) {
 		boil.DebugMode = true
 	}
 	
-	// graphql apis
-	// graphqlHandler.AroundOperations(func(ctx context.Context, next graphql2.OperationHandler) graphql2.ResponseHandler {
-	// 	return authMw.GraphQLMiddleware(ctx, jwt, next)
-	// })
 	e.POST(graphQLPathname, func(c echo.Context) error {
 		req := c.Request()
 		res := c.Response()

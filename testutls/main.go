@@ -2,6 +2,7 @@ package testutls
 
 import (
 	"database/sql"
+	"database/sql/driver"
 	"fmt"
 	"go-template/gqlmodels"
 	"go-template/models"
@@ -25,6 +26,8 @@ var ArticleKey key = "article"
 
 var MockID int = 1
 var MockActive bool = false
+var MockTitle string = "Title"
+var MockCount = int(1)
 
 func MockAuthor() *models.Author {
      return &models.Author {
@@ -32,7 +35,6 @@ func MockAuthor() *models.Author {
           FirstName: null.StringFrom("First"),
           LastName: null.StringFrom("Last"),
           Username: null.StringFrom("username"),
-          Active: null.BoolFrom(false),
      }
 }
 
@@ -109,4 +111,10 @@ func IsInTests () bool {
           }
      }
      return false
+}
+
+type QueryData struct {
+     Actions *[]driver.Value
+     Query string
+     DBResponse *sqlmock.Rows
 }

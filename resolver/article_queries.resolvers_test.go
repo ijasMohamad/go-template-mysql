@@ -87,7 +87,6 @@ func TestArticle(t *testing.T) {
                name: "Success",
                wantErr: false,
                req: 1,
-               // wantResp: testutls.MockGqlArticle(),
                wantResp: &gqlmodels.Article{
                     ID: strconv.Itoa(testutls.MockArticle().ID),
                     Title: convert.NullDotStringToPointerString(testutls.MockArticle().Title),

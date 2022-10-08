@@ -32,31 +32,39 @@ func (r *mutationResolver) CreateAuthor(ctx context.Context, input gqlmodels.Aut
 	}
 	cfg, err := config.Load()
 	if err != nil {
+
+		fmt.Println("Error in loading config")
 		return nil, fmt.Errorf("Error in loading config")
 	}
 	sec := service.Secure(cfg)
-	author.Password = null.StringFrom(sec.Hash(author.Password.String))
-
+	fmt.Println("INPUT Password: ", author.Password.String)
+	if author.Password.String != "" {
+		author.Password = null.StringFrom(sec.Hash(author.Password.String))
+	}
+	fmt.Println("Hashed password: ", author.Password)
 	// daos..
 	newAuthor, err := daos.CreateAuthor(author, ctx)
 	if err != nil {
+		fmt.Println("Error in creating author in doas", err)
+		fmt.Println("New Author: ", newAuthor)
 		return nil, err
 	}
 	graphqlAuthor := cnvrttogql.AuthorToGraphQLAuthor(&newAuthor)
 
-	// r.Lock()
-	// for _, observer := range r.Observers {
-	// 	observer <- graphqlAuthor
-	// }
-	// r.Unlock()
+	fmt.Println("GRAPHQL AUTHOR: ", graphqlAuthor)
+
+	graphqlAuthor.Password = nil
 
 	return graphqlAuthor, nil
 }
 
 // UpdateAuthor is the resolver for the updateAuthor field.
 func (r *mutationResolver) UpdateAuthor(ctx context.Context, input *gqlmodels.AuthorUpdateInput) (*gqlmodels.Author, error) {
+
+	fmt.Println("INPUT ID: ", input.ID)
 	authorID, err := strconv.Atoi(input.ID)
 	if err != nil {
+		fmt.Println("Error in resolver", err)
 		return nil, err
 	}
 
@@ -92,22 +100,15 @@ func (r *mutationResolver) UpdateAuthor(ctx context.Context, input *gqlmodels.Au
 	// daos...
 	_, err = daos.UpdateAuthor(a, ctx)
 	if err != nil {
+		fmt.Println("Error while updating author", err)
 		return nil, err
 	}
 	graphqlAuthor := cnvrttogql.AuthorToGraphQLAuthor(&a)
-
-	// r.Lock()
-	// for _, observer := range r.Observers {
-	// 	observer <- graphqlAuthor
-	// }
-	// r.Unlock()
-
 	return graphqlAuthor, nil
 }
 
 // DeleteAuthor is the resolver for the deleteAuthor field.
-func (r *mutationResolver) DeleteAuthor(ctx context.Context, input *gqlmodels.AuthorDeleteInput) (*gqlmodels.AuthorDeletePayload, error) {
-	//nolint
+func (r *mutationResolver) DeleteAuthor(ctx context.Context, input *gqlmodels.AuthorDeleteInput) (*gqlmodels.AuthorDeletePayload, error) { //nolint
 	authorID, err := strconv.Atoi(input.ID)
 	if err != nil {
 		return nil, err
